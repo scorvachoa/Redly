@@ -1,0 +1,31 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# Descargas locales (CLI)
+downloads/
+*.mp4
+*.mp3
+manifest.json
+
+# Salida de pruebas / herramientas
+coverage/
+test-results/
+playwright-report/
+.eslintcache
+
+# Seguridad / entorno
+.env
+.env*.local
+*.log
+.DS_Store
+Thumbs.db
+
+# Los iconos de public/icons/ NO se ignoran: son entradas de build y tienen que
+# viajar al despliegue. Lo mismo con app/icon.svg, app/favicon.ico y
+# app/apple-icon.png.

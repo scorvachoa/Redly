@@ -1,0 +1,1359 @@
+/* ==========================================================================
+   Red.ly — hoja de estilos
+   Tailwind CSS v4 + clases semánticas propias.
+   Diseño minimalista: una sola columna, tarjetas planas, acento rojo.
+   Tema claro/oscuro con variables CSS controladas por `data-theme` en <html>.
+   ========================================================================== */
+
+@import "tailwindcss";
+
+/* El tema lo decide el script del <head> escribiendo `data-theme` en <html>.
+   Esta variante alinea el prefijo `dark:` de Tailwind con esa decisión. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* --------------------------------------------------------------------------
+   Tokens de diseño.
+   Los valores crudos viven en :root / [data-theme]; `@theme inline` los expone
+   como utilidades de Tailwind que resuelven en runtime, así el tema cambia sin
+   recargar y sin duplicar clases.
+   -------------------------------------------------------------------------- */
+:root {
+  --radius: 14px;
+  --radius-sm: 10px;
+
+  /* Tema claro (por defecto) */
+  --page: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #fafafc;
+  --border: #e4e4ea;
+  --hover: #f0f0f5;
+  --text: #14141a;
+  --muted: #7c7c8a;
+  --placeholder: #a2a2ae;
+  --entry: #ffffff;
+  --accent: #fe2c55;
+  --accent-hover: #ff4169;
+  --accent-pressed: #d92148;
+  --accent-text: #ffffff;
+  --ok: #128a5c;
+  --error: #d33a3a;
+  --shadow: 0 1px 2px rgba(20, 20, 26, 0.04), 0 8px 24px rgba(20, 20, 26, 0.06);
+}
+
+[data-theme="dark"] {
+  --page: #0f0f12;
+  --surface: #17171c;
+  --surface-2: #1b1b22;
+  --border: #272730;
+  --hover: #1d1d25;
+  --text: #ececf2;
+  --muted: #8e8e9c;
+  --placeholder: #6b6b78;
+  --entry: #1b1b22;
+  --accent: #ff3b62;
+  --accent-hover: #ff5c7e;
+  --accent-pressed: #db2449;
+  --accent-text: #ffffff;
+  --ok: #2fb37e;
+  --error: #ff6b6b;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+@theme {
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --default-transition-duration: 140ms;
+  --default-transition-timing-function: ease;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-hover: var(--hover);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-placeholder: var(--placeholder);
+  --color-entry: var(--entry);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-pressed: var(--accent-pressed);
+  --color-accent-text: var(--accent-text);
+  --color-ok: var(--ok);
+  --color-danger: var(--error);
+
+  --radius-card: var(--radius);
+  --radius-ctl: var(--radius-sm);
+  --shadow-card: var(--shadow);
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+body {
+  @apply bg-page font-sans text-[15px] leading-[1.5] text-ink antialiased transition-colors;
+}
+
+a {
+  @apply text-accent;
+}
+
+/* --------------------------------------------------------------------------
+   Estructura
+   -------------------------------------------------------------------------- */
+.shell {
+  @apply flex min-h-screen flex-col;
+}
+
+/* La cabecera es sólo el marco (borde + fondo). El contenido va dentro de
+   `.header__inner`, que replica el ancho y el padding de `.main`, de forma que
+   la marca y el botón de tema caen sobre el mismo eje vertical que el texto.
+   Todas las páginas comparten el mismo ancho: 1080px. */
+.header {
+  @apply sticky top-0 z-10 border-b border-line bg-surface transition-colors;
+}
+
+.header__inner {
+  @apply mx-auto flex min-h-[62px] w-full max-w-[1080px] items-center justify-between gap-4 px-6;
+}
+
+.brand__name {
+  @apply text-[20px] font-bold tracking-[-0.02em] text-ink no-underline;
+}
+
+.brand__name span {
+  @apply text-accent;
+}
+
+/* --------------------------------------------------------------------------
+   Navegación de la cabecera
+   -------------------------------------------------------------------------- */
+.nav {
+  @apply flex items-center gap-0.5;
+}
+
+.nav__item {
+  @apply relative;
+}
+
+/* `cursor-pointer` porque en Tailwind v4 el Preflight deja los `<button>` con
+   `cursor: default`. Los disparadores son botones y no enlaces: al pulsarlos
+   sólo se despliega el menú, no se navega. */
+.nav__trigger {
+  @apply inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-ctl px-3 py-2 text-[13.5px] font-semibold text-muted no-underline transition-colors;
+}
+
+.nav__trigger:hover,
+.nav__item:focus-within > .nav__trigger {
+  @apply bg-hover text-ink;
+}
+
+.nav__caret {
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.55;
+}
+
+/* Se anima sólo la opacidad. Un `translateY` desplazaría también el puente de
+   arriba y dejaría un hueco de 4px sin cubrir mientras dura la animación. */
+.nav__menu {
+  @apply invisible absolute left-0 top-full z-30 mt-2 min-w-[252px] rounded-card border border-line bg-surface p-1.5 opacity-0 shadow-card;
+  transition:
+    opacity 140ms ease,
+    visibility 140ms;
+  pointer-events: none;
+}
+
+/* Puente invisible sobre el `mt-2` del menú. Sin él, al bajar el ratón desde
+   el disparador se cruza un hueco donde no hay nada bajo el puntero, `:hover`
+   se pierde un instante y el menú se cierra antes de llegar a los enlaces.
+   Hereda `pointer-events` y `visibility` del menú, así que sólo está activo
+   cuando el menú está abierto. */
+.nav__menu::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+}
+
+.nav__item:hover .nav__menu,
+.nav__item:focus-within .nav__menu {
+  @apply visible opacity-100;
+  pointer-events: auto;
+}
+
+.nav__group {
+  @apply px-2.5 pt-1 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-muted;
+}
+
+.nav__link {
+  @apply flex items-center gap-2.5 rounded-ctl px-2.5 py-[7px] text-[13.5px] text-ink no-underline transition-colors;
+}
+
+.nav__link:hover {
+  @apply bg-hover;
+}
+
+.nav__link:hover .nav__link-name {
+  @apply text-accent;
+}
+
+.nav__link-icon {
+  @apply grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] text-white;
+  background: var(--tile, var(--accent));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.nav__link-name {
+  @apply flex-1 font-medium;
+}
+
+.nav__link--muted {
+  @apply text-muted;
+}
+
+.nav__link--muted .nav__link-icon {
+  opacity: 0.5;
+}
+
+.nav__link--muted .nav__link-name {
+  @apply font-normal;
+}
+
+.nav__link--muted:hover .nav__link-name {
+  @apply text-ink;
+}
+
+.nav__link-ready {
+  @apply rounded-full border border-accent/30 px-2 py-px text-[10px] font-bold uppercase tracking-[0.05em] text-accent;
+}
+
+.nav__link-soon {
+  @apply text-[11px] text-placeholder;
+}
+
+.nav__link:hover .nav__link-soon {
+  @apply text-muted;
+}
+
+.main {
+  @apply mx-auto w-full max-w-[1080px] flex-1 px-6 pt-[34px] pb-16;
+}
+
+/* --------------------------------------------------------------------------
+   Pie
+   -------------------------------------------------------------------------- */
+.site-footer {
+  @apply mt-14 border-t border-line bg-surface py-10;
+}
+
+.site-footer__inner {
+  @apply mx-auto flex w-full max-w-[1080px] flex-wrap justify-between gap-x-10 gap-y-9 px-6;
+}
+
+.site-footer__brand {
+  @apply max-w-[32ch];
+}
+
+.site-footer__tag {
+  @apply mt-2.5 text-[13px] leading-[1.6] text-muted;
+}
+
+.site-footer__cols {
+  @apply flex flex-wrap gap-x-10 gap-y-8;
+}
+
+.site-footer__col {
+  @apply flex min-w-[112px] flex-col gap-2;
+}
+
+.site-footer__title {
+  @apply mb-0.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-muted;
+}
+
+.site-footer__link {
+  @apply text-[13.5px] text-ink no-underline transition-colors;
+}
+
+.site-footer__link:hover {
+  @apply text-accent;
+}
+
+.site-footer__legal {
+  @apply mx-auto mt-9 w-full max-w-[1080px] border-t border-line px-6 pt-6 text-[12px] leading-[1.6] text-muted;
+}
+
+/* --------------------------------------------------------------------------
+   Controles
+   -------------------------------------------------------------------------- */
+.label {
+  @apply mb-2 block text-[11px] font-bold uppercase tracking-[0.09em] text-muted;
+}
+
+.url-row {
+  @apply flex gap-3;
+}
+
+.input {
+  @apply flex-1 rounded-ctl border border-line bg-entry px-3.5 py-[13px] text-[15px] text-ink outline-none transition-[border-color,box-shadow,background-color];
+  font-family: inherit;
+}
+
+.input::placeholder {
+  @apply text-placeholder;
+}
+
+.input:focus {
+  @apply border-accent;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* `inline-flex` en vez del `inline-block` por defecto: el Preflight de Tailwind
+   deja los `svg` en bloque, así que un icono dentro del botón se apilaba encima
+   del texto. Con flex, icono y texto comparten una sola línea centrados y el
+   `gap` fija la separación sin depender del espacio del JSX. Los botones sin
+   icono quedan igual: tienen un único hijo y el `gap` no aplica. */
+.btn {
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-ctl border-0 px-6 py-[13px] text-[15px] font-bold whitespace-nowrap transition-[background-color,color,transform,opacity];
+  font-family: inherit;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  @apply cursor-not-allowed opacity-[0.55];
+}
+
+.btn--primary {
+  @apply bg-accent text-accent-text;
+}
+
+.btn--primary:hover:not(:disabled) {
+  @apply bg-accent-hover;
+}
+
+.btn--ghost {
+  @apply border border-line bg-transparent text-muted;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  @apply bg-hover text-ink;
+}
+
+.btn--lg {
+  @apply px-5 py-[11px] text-[14.5px];
+}
+
+.btn--theme {
+  @apply grid h-[38px] w-[38px] place-items-center rounded-full border border-line bg-page p-0 text-[17px] text-ink;
+}
+
+.btn--theme:hover {
+  @apply bg-hover;
+}
+
+/* --------------------------------------------------------------------------
+   Estado
+   -------------------------------------------------------------------------- */
+.status {
+  @apply mt-4 flex min-h-[21px] items-center gap-2 text-[14px] text-muted;
+}
+
+.status__icon {
+  @apply shrink-0;
+}
+
+.status--ok .status__icon {
+  @apply text-ok;
+}
+
+.status--error .status__icon {
+  @apply text-danger;
+}
+
+.status--info .status__icon {
+  @apply text-accent;
+}
+
+.status--ok {
+  @apply text-ok;
+}
+
+.status--error {
+  @apply text-danger;
+}
+
+.hint {
+  @apply mt-3.5 text-center text-[12.5px] text-muted;
+}
+
+.hint code {
+  @apply rounded-md border border-line bg-surface px-[7px] py-0.5 text-xs;
+}
+
+/* --------------------------------------------------------------------------
+   Tarjeta de resultado
+   -------------------------------------------------------------------------- */
+.card {
+  @apply rounded-card border border-line bg-surface shadow-card transition-colors;
+}
+
+.result {
+  @apply mt-2 flex gap-[22px] p-5;
+}
+
+.result__thumb {
+  @apply grid h-[148px] w-[110px] shrink-0 place-items-center overflow-hidden rounded-ctl bg-hover text-center text-[12.5px] text-muted;
+}
+
+.result__thumb img {
+  @apply block h-full w-full object-cover;
+}
+
+.result__body {
+  @apply min-w-0 flex-1;
+}
+
+.result__title {
+  @apply mt-0.5 text-[17px] font-bold leading-[1.35] break-words;
+}
+
+.result__meta {
+  @apply mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-muted;
+}
+
+.result__meta b {
+  @apply font-semibold text-ink;
+}
+
+/* --------------------------------------------------------------------------
+   Tarjetas de opción (modo vídeo)
+   -------------------------------------------------------------------------- */
+.section-title {
+  @apply mx-0 mb-3 mt-[26px] text-[11px] font-bold uppercase tracking-[0.09em] text-muted;
+}
+
+.options {
+  @apply flex flex-col gap-2.5;
+}
+
+.option {
+  @apply flex cursor-pointer items-center gap-3.5 border-l-[3px] border-l-transparent px-[18px] py-[15px] transition-[border-color,background-color];
+}
+
+.option:hover {
+  @apply bg-hover;
+}
+
+.option--selected {
+  @apply border-l-accent bg-surface-2;
+}
+
+.option__name {
+  @apply min-w-0 flex-1 overflow-hidden text-[14.5px] font-semibold text-ellipsis whitespace-nowrap;
+}
+
+.option__badge {
+  @apply whitespace-nowrap text-xs uppercase tracking-[0.04em] text-muted;
+}
+
+/* --------------------------------------------------------------------------
+   Lista de perfil (modo lote)
+   -------------------------------------------------------------------------- */
+/* Cabecera de la lista: el título a la izquierda y las acciones de selección
+   a la derecha. Reproduce los márgenes de `.section-title` (26px/12px) y se los
+   quita, para que la fila no los sume a los suyos y la separación sea igual
+   que antes de existir la fila. */
+.list-head {
+  @apply mt-[26px] mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2;
+}
+
+.list-head .section-title {
+  @apply mt-0 mb-0;
+}
+
+.list-head__actions {
+  @apply flex flex-wrap items-center gap-2;
+}
+
+.videos {
+  @apply flex max-h-[420px] flex-col gap-0.5 overflow-y-auto pr-1;
+}
+
+.video-row {
+  @apply flex items-center gap-3 rounded-ctl px-3.5 py-[11px] transition-colors;
+}
+
+.video-row:hover {
+  @apply bg-hover;
+}
+
+.video-row__idx {
+  @apply w-[26px] shrink-0 text-right text-[12.5px] text-muted;
+}
+
+.video-row__body {
+  @apply min-w-0 flex-1;
+}
+
+/* `block`: la fila entera es un `<label>` (para poder tocarla en móvil), así que
+   estos dos pasan a `<span>`, que es inline y no recorta ni apila. */
+.video-row__title {
+  @apply block overflow-hidden text-[13.5px] font-semibold text-ellipsis whitespace-nowrap;
+}
+
+.video-row__meta {
+  @apply block text-xs text-muted;
+}
+
+.badge {
+  @apply shrink-0 whitespace-nowrap rounded-full px-[9px] py-[3px] text-[11px] font-bold text-accent;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.badge--done {
+  @apply text-muted;
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Historial de descargas (filas ya bajadas y barra de control)
+   -------------------------------------------------------------------------- */
+.video-row__check {
+  @apply h-4 w-4 shrink-0 cursor-pointer accent-accent;
+}
+
+.video-row__check:disabled {
+  @apply cursor-not-allowed opacity-[0.45];
+}
+
+.video-row--done {
+  @apply opacity-[0.55];
+}
+
+.video-row--done .video-row__title {
+  @apply line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+/* «Vídeos nuevos a buscar».
+   Dos filas independientes para que ninguna pueda desbordar la tarjeta: la de
+   cabecera (etiqueta + recuento y borrado del historial) y la de controles
+   (cuántos buscar + volver a analizar). Cada fila se envuelve sola cuando no
+   cabe, en lugar de empujar al resto hacia fuera. */
+.history-bar {
+  @apply flex flex-col gap-3 p-5;
+}
+
+/* El `margin-bottom` de `.label` la descolocaría dentro de la fila flex;
+   de la separación entre filas se encarga el `gap`. */
+.history-bar .label {
+  @apply mb-0;
+}
+
+.history-bar__head {
+  @apply flex flex-wrap items-center justify-between gap-x-3 gap-y-2;
+}
+
+.history-bar__meta {
+  @apply flex flex-wrap items-center gap-2;
+}
+
+.history-bar__count {
+  @apply text-[12.5px] text-muted;
+}
+
+.history-bar__count b {
+  @apply font-semibold text-ink;
+}
+
+.history-bar__row {
+  @apply flex flex-wrap items-center gap-2.5;
+}
+
+/* El `gap` de la tarjeta ya separa la nota del último elemento. */
+.history-bar .note {
+  @apply mt-0;
+}
+
+.input--narrow {
+  @apply w-[128px] shrink-0 grow-0 basis-[128px];
+}
+
+/* --------------------------------------------------------------------------
+   Destino de las descargas (carpeta elegida o Descargas del navegador)
+   -------------------------------------------------------------------------- */
+/* `flex` es imprescindible: sin él, `justify-between`/`justify-end` y
+   `align-items` no harían nada y la etiqueta y los botones se apilarían.
+   Viaja como último hijo de `.actions`: `ml-auto` lo empuja al extremo
+   derecho y `justify-end` mantiene ambas líneas a la derecha si se parte. */
+.destination__row {
+  @apply ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2;
+}
+
+.destination__label {
+  @apply flex min-w-0 items-center gap-2 text-[0.88rem] text-muted;
+}
+
+/* `min-w-0` deja que la etiqueta se estreche hasta el ancho de línea y
+   `overflow-wrap: anywhere` corta un nombre de carpeta largo, que no tiene
+   dónde partirse y desbordaría la tarjeta. */
+.destination__label b {
+  @apply min-w-0 font-semibold text-ink;
+  overflow-wrap: anywhere;
+}
+
+.destination__actions {
+  @apply flex items-center gap-2;
+}
+
+.destination__hint {
+  @apply min-w-0 text-[0.82rem] text-muted;
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   Acciones y progreso
+   -------------------------------------------------------------------------- */
+/* Barra final del panel: los botones de acción a la izquierda y el destino
+   empujado a la derecha, en la misma línea. El destino se movió aquí desde la
+   tarjeta de la URL porque sólo importa en el momento de guardar. */
+.download-bar {
+  @apply mt-[22px] flex flex-col gap-4 p-5;
+}
+
+/* Dentro de la barra la separación la pone el `gap`, no el margen de `.actions`. */
+.download-bar .actions {
+  @apply mt-0;
+}
+
+/* `flex-wrap` porque `.btn` lleva `whitespace-nowrap` y no cede: cuando los
+   botones y el destino no caben —ventanas de 561–720px, o un destino con carpeta
+   elegida, que añade un botón— el destino pasaba a estrecharse en la misma línea.
+   Con envoltura pasa a la siguiente y `ml-auto` lo mantiene a la derecha. Por
+   debajo de 560px la barra va en columna y este margen lo anula la regla propia. */
+.actions {
+  @apply mt-[22px] flex flex-wrap gap-3;
+}
+
+.progress {
+  @apply mt-4 rounded-card border border-line bg-surface p-4 shadow-card transition-colors;
+}
+
+.progress__bar {
+  @apply relative h-2 overflow-hidden rounded-full bg-line;
+}
+
+.progress__fill {
+  @apply h-full w-0 bg-accent transition-[width] duration-[90ms] ease-linear;
+}
+
+.progress__fill--indeterminate {
+  width: 32% !important;
+  @apply animate-[slide_1.1s_ease-in-out_infinite];
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.progress__text {
+  @apply mt-[9px] text-[13px] tabular-nums text-muted;
+}
+
+.note {
+  @apply mt-3.5 text-[12.5px] leading-[1.6] text-muted;
+}
+
+@media (max-width: 560px) {
+  .url-row {
+    @apply flex-col;
+  }
+  .result {
+    @apply flex-col;
+  }
+  .result__thumb {
+    @apply h-[180px] w-full;
+  }
+  .actions {
+    @apply flex-col;
+  }
+  .btn {
+    @apply w-full;
+  }
+  /* En columna, `ml-auto` mandaría el destino a la derecha del todo: se
+     devuelve al eje para que quede debajo de los botones, leyéndose de
+     izquierda a derecha. */
+  .download-bar .actions .destination__row {
+    @apply ml-0 justify-start;
+  }
+  /* Los dos botones del destino son accesorios; estirarlos a pantalla
+     completa los convertiría en lo más llamativo de la tarjeta. */
+  .destination__actions .btn {
+    @apply w-auto;
+  }
+  /* Mismo caso que el destino: `.btn { w-full }` de este bloque va después de
+     `.btn--theme` en el archivo y, al ser la misma especificidad, le gana por
+     orden de fuente. El botón de tema se estiraba a todo el ancho, no cabía en
+     la fila de la marca y bajaba a una línea propia: la cabecera se partía en
+     tres filas y el tema quedaba abajo en vez de a la derecha de «Red.ly». */
+  .btn--theme {
+    @apply w-[38px];
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Hero de la portada
+   -------------------------------------------------------------------------- */
+.hero {
+  @apply relative isolate py-[34px] pb-3;
+}
+
+/* Destello radial de fondo: da profundidad sin imágenes externas.
+   Sólo sangra en vertical. El horizontal (-40px por lado) se quitó: `.hero` vive
+   dentro de `.main` (`px-6`) y ningún ancestro recorta —`.shell` y `<body>` no
+   tienen `overflow`, y meter `overflow-x: hidden` en ellos rompería el
+   `position: sticky` de la cabecera—, así que sobresalir provocaba una barra
+   horizontal de ~16px en cualquier pantalla estrecha de 1112px: móviles,
+   tablets y portátiles de 1080. El degradado es transparente en los bordes, así
+   que el sangrado no se distinguía. */
+.hero__glow {
+  position: absolute;
+  inset: -80px 0 auto;
+  height: 280px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(46% 60% at 22% 30%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(40% 55% at 78% 10%, color-mix(in srgb, #7c5cff 16%, transparent), transparent 70%);
+  filter: blur(28px);
+  opacity: 0.9;
+}
+
+.hero__badge {
+  @apply mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface py-[5px] pr-3 pl-2.5 text-xs font-semibold text-muted;
+}
+
+.hero__badge-dot {
+  @apply h-[7px] w-[7px] rounded-full bg-ok;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
+}
+
+.hero__title {
+  @apply mb-[18px] text-[clamp(32px,6.2vw,52px)] font-bold leading-[1.08] tracking-[-0.035em];
+}
+
+.hero__title span {
+  background: linear-gradient(100deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7c5cff));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero__text {
+  @apply mb-[26px] max-w-[60ch] text-base leading-[1.65] text-muted;
+}
+
+.hero__actions {
+  @apply mb-[26px] flex flex-wrap items-center justify-between gap-3;
+}
+
+.hero__actions-main {
+  @apply flex flex-wrap gap-3;
+}
+
+.hero__actions-side {
+  @apply shrink-0;
+}
+
+.hero__stats {
+  @apply flex flex-wrap items-center gap-3.5 text-[12.5px] text-muted;
+}
+
+.hero__stats b {
+  @apply font-bold text-ink;
+}
+
+.hero__stats-sep {
+  @apply h-1 w-1 rounded-full bg-line;
+}
+
+/* --------------------------------------------------------------------------
+   Secciones de la portada
+   -------------------------------------------------------------------------- */
+.landing-section {
+  @apply mt-11;
+}
+
+.section-head {
+  @apply mb-4 flex items-start justify-between gap-4;
+}
+
+.section-head .section-title {
+  @apply mb-1 mt-0;
+}
+
+.landing-section__lead {
+  @apply max-w-[62ch] text-sm leading-[1.6] text-muted;
+}
+
+/* --------------------------------------------------------------------------
+   Sección «Obtener programa»
+   -------------------------------------------------------------------------- */
+.program-grid {
+  @apply grid grid-cols-2 gap-4;
+}
+
+.program-card {
+  @apply rounded-card border border-line bg-surface p-5;
+}
+
+.program-card--ready {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.program-card__head {
+  @apply mb-3.5 flex items-center gap-3;
+}
+
+.program-card__icon {
+  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-ctl border border-line bg-entry text-accent;
+}
+
+.program-card__id {
+  @apply flex-1;
+}
+
+.program-card__name {
+  @apply text-[15px] font-bold text-ink;
+}
+
+.program-card__meta {
+  @apply text-[12px] text-muted;
+}
+
+.program-card__text {
+  @apply mb-4 text-[13.5px] leading-[1.65] text-muted;
+}
+
+.program-list {
+  @apply mb-4 mt-0 flex list-none flex-col gap-2.5 p-0;
+}
+
+.program-list li {
+  @apply flex items-start gap-2.5 text-[13.5px] leading-[1.55] text-ink;
+}
+
+.program-list li svg {
+  @apply mt-[3px] shrink-0 text-accent;
+}
+
+.program-list--muted li {
+  @apply text-muted;
+}
+
+.program-list--muted li svg {
+  @apply text-muted;
+}
+
+.program-code {
+  @apply mb-4 overflow-x-auto rounded-card border border-line bg-entry p-3.5 text-[12.5px] leading-[1.7] text-ink;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.program-code code {
+  font-family: inherit;
+}
+
+.program-card__note {
+  @apply text-[12.5px] leading-[1.6] text-placeholder;
+}
+
+/* --------------------------------------------------------------------------
+   Instalación como aplicación (PWA)
+   -------------------------------------------------------------------------- */
+/* Ocupa las dos columnas de la rejilla: es una acción distinta de la CLI o
+   la app de escritorio, y necesita sitio para las instrucciones de iOS. */
+.program-card--install {
+  grid-column: 1 / -1;
+  margin-top: var(--spacing);
+}
+
+.install {
+  @apply rounded-card border border-line bg-entry p-3.5;
+}
+
+.install__row {
+  @apply flex flex-wrap items-center gap-3;
+}
+
+.install__icon {
+  @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-ctl border border-line bg-surface text-accent;
+}
+
+.install__icon--ok {
+  @apply text-ok;
+}
+
+.install__text {
+  @apply min-w-0 flex-1 text-[13px] leading-[1.6] text-muted;
+}
+
+.install__text b {
+  @apply font-semibold text-ink;
+}
+
+.install__steps {
+  @apply mt-3 flex flex-col gap-1.5 pl-0 text-[13px] leading-[1.6] text-muted;
+  list-style: none;
+}
+
+.install__steps li {
+  @apply flex gap-2;
+}
+
+.install__steps b {
+  @apply shrink-0 font-semibold text-ink;
+}
+
+/* --------------------------------------------------------------------------
+   Documentos de texto (privacidad)
+   -------------------------------------------------------------------------- */
+.doc__title {
+  @apply mb-3 mt-0 text-[28px] font-bold leading-[1.2] tracking-[-0.02em] text-ink;
+}
+
+/* A 1080px de ancho, los párrafos se estirarían hasta ~1030px: se limita la
+   medida para que la lectura siga siendo cómoda. Los títulos sí ocupan el ancho. */
+.doc__lead {
+  @apply mb-9 max-w-[72ch] text-[15px] leading-[1.65] text-muted;
+}
+
+.doc h2 {
+  @apply mb-2.5 mt-9 text-[17px] font-bold text-ink;
+}
+
+.doc p {
+  @apply mb-3.5 max-w-[72ch] text-[14.5px] leading-[1.7] text-muted;
+}
+
+.doc ul {
+  @apply mb-4 mt-0 flex list-none flex-col gap-2.5 p-0;
+}
+
+.doc li {
+  @apply relative max-w-[72ch] pl-5 text-[14.5px] leading-[1.65] text-muted;
+}
+
+.doc li::before {
+  content: "";
+  @apply absolute left-0 top-[9px] h-1.5 w-1.5 rounded-full bg-accent;
+}
+
+.doc li b {
+  @apply text-ink;
+}
+
+.doc code {
+  @apply rounded bg-entry px-1.5 py-0.5 text-[13px] text-ink;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* El `a` global sólo pinta el color: dentro de un documento hace falta
+   subrayado para que un enlace se distinga del texto corrido. */
+.doc a {
+  @apply font-medium underline underline-offset-2;
+}
+
+.doc__table {
+  @apply my-4 flex flex-col overflow-hidden rounded-card border border-line;
+}
+
+.doc__row {
+  @apply flex flex-wrap gap-x-5 gap-y-1 border-b border-line px-4 py-3;
+}
+
+.doc__row:last-child {
+  @apply border-b-0;
+}
+
+.doc__key {
+  @apply min-w-[150px] text-[13px] font-semibold text-ink;
+}
+
+.doc__val {
+  @apply flex-1 text-[13.5px] leading-[1.6] text-muted;
+}
+
+.platform-grid {
+  @apply grid grid-cols-3 gap-3;
+}
+
+.platform-grid--compact {
+  @apply my-[18px];
+}
+
+/* --------------------------------------------------------------------------
+   Tarjetas de plataforma
+   -------------------------------------------------------------------------- */
+.platform-card {
+  /* Color de la plataforma; cada tarjeta lo sobreescribe con su `--tile`. */
+  --tile: var(--accent);
+  @apply flex items-center gap-[13px] rounded-card border border-line bg-surface p-[15px] text-ink no-underline transition-[border-color,background-color,transform,box-shadow];
+}
+
+.platform-card:hover {
+  @apply bg-hover shadow-card;
+  border-color: color-mix(in srgb, var(--tile, var(--accent)) 55%, var(--border));
+  transform: translateY(-2px);
+}
+
+.platform-card--ready {
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 5%, var(--surface)),
+    var(--surface)
+  );
+}
+
+/* La variable --tile la hereda de la tarjeta (color de la plataforma). */
+.platform-card__mono {
+  @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white;
+  background: var(--tile);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 4px 12px color-mix(in srgb, var(--tile) 32%, transparent);
+}
+
+.platform-card__body {
+  @apply flex min-w-0 flex-1 flex-col gap-0.5;
+}
+
+.platform-card__name {
+  @apply text-[14.5px] font-semibold;
+}
+
+.platform-card__blurb {
+  @apply text-[12.5px] leading-[1.45] text-muted;
+}
+
+.pill {
+  @apply shrink-0 whitespace-nowrap rounded-full border border-line bg-surface-2 px-[9px] py-1 text-[11px] font-semibold text-muted;
+}
+
+.pill--ready {
+  @apply text-ok;
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Features
+   -------------------------------------------------------------------------- */
+.feature-grid {
+  @apply mt-4 grid grid-cols-3 gap-3;
+}
+
+.feature {
+  @apply flex gap-3 rounded-card border border-line bg-surface p-4 transition-[border-color,background-color];
+}
+
+.feature:hover {
+  @apply bg-hover;
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.feature__icon {
+  @apply grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] text-accent;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.feature__title {
+  @apply mb-[3px] text-sm font-semibold;
+}
+
+.feature__text {
+  @apply text-[12.8px] leading-[1.55] text-muted;
+}
+
+/* --------------------------------------------------------------------------
+   Pasos
+   -------------------------------------------------------------------------- */
+.steps {
+  @apply mt-4 grid grid-cols-3 gap-3;
+}
+
+.step {
+  @apply relative flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 pt-[18px] pb-4;
+}
+
+.step__num {
+  @apply absolute top-3.5 right-3.5 rounded-full px-2 py-0.5 text-xs font-bold;
+  color: color-mix(in srgb, var(--accent) 75%, var(--muted));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.step__icon {
+  @apply grid h-8 w-8 place-items-center rounded-[9px] border border-line bg-surface-2 text-ink;
+}
+
+.step__title {
+  @apply text-sm font-semibold;
+}
+
+.step__text {
+  @apply text-[12.8px] leading-[1.55] text-muted;
+}
+
+/* Rejillas de la portada: 3 por defecto, 2 en tablet, 1 en móvil.
+   El orden es decreciente para que la cascada resuelva bien. */
+@media (max-width: 960px) {
+  .platform-grid,
+  .feature-grid {
+    @apply grid-cols-2;
+  }
+}
+
+@media (max-width: 720px) {
+  .feature-grid,
+  .steps,
+  .program-grid {
+    @apply grid-cols-1;
+  }
+  .section-head {
+    @apply flex-col gap-2;
+  }
+  .hero__actions {
+    @apply justify-start;
+  }
+  .header__inner {
+    @apply min-h-0 flex-wrap gap-y-1 py-2.5;
+  }
+  .nav {
+    @apply order-3 w-full flex-wrap gap-0;
+  }
+  .nav__trigger {
+    @apply px-2.5 text-[13px];
+  }
+  .site-footer {
+    @apply py-8;
+  }
+  .site-footer__legal {
+    @apply mt-7;
+  }
+}
+
+@media (max-width: 560px) {
+  .platform-grid {
+    @apply grid-cols-1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Cabecera de plataforma y estado «Próximamente»
+   -------------------------------------------------------------------------- */
+.platform-head {
+  @apply mb-[22px] mt-1.5 flex items-center gap-3.5;
+}
+
+.platform-head__mono {
+  --tile: var(--accent);
+  @apply grid h-[46px] w-[46px] place-items-center rounded-[13px] text-white;
+  background: var(--tile);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 4px 14px color-mix(in srgb, var(--tile) 34%, transparent);
+}
+
+.platform-head__title {
+  @apply m-0 text-2xl tracking-[-0.02em];
+}
+
+.platform-head__hosts {
+  @apply mt-0.5 text-[12.5px] text-muted;
+}
+
+.soon {
+  @apply p-[26px];
+}
+
+.soon__badge {
+  @apply mb-3.5 inline-block rounded-full border border-line bg-surface-2 px-[11px] py-1 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted;
+}
+
+.soon__title {
+  @apply mb-2.5 text-[19px] tracking-[-0.01em];
+}
+
+.soon__text {
+  @apply mb-3 max-w-[66ch] text-sm leading-[1.65] text-muted;
+}
+
+.soon__text b {
+  @apply text-ink;
+}
+
+.soon__actions {
+  @apply mt-5 flex flex-wrap gap-2.5;
+}
+
+/* --------------------------------------------------------------------------
+   Descargador: cabecera, tarjeta de acción, modos y estadísticas
+   -------------------------------------------------------------------------- */
+.tool-head {
+  --tile: var(--accent);
+  @apply mb-3.5 flex items-center gap-3.5;
+}
+
+.tool-head__icon {
+  @apply grid h-12 w-12 shrink-0 place-items-center rounded-[14px] text-white;
+  background: var(--tile);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 4px 16px color-mix(in srgb, var(--tile) 34%, transparent);
+}
+
+.tool-head__body {
+  @apply min-w-0;
+}
+
+.tool-head__title {
+  @apply m-0 text-[24px] tracking-[-0.02em];
+}
+
+.tool-head__lead {
+  @apply mt-1 text-[13px] leading-[1.55] text-muted;
+}
+
+.chips {
+  @apply mb-[18px] flex flex-wrap gap-2;
+}
+
+.chip {
+  @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-[5px] text-xs font-semibold text-muted transition-colors;
+}
+
+.chip:hover {
+  @apply border-line bg-hover text-ink;
+}
+
+/* --- Tarjeta de acción principal ----------------------------------------- */
+.tool-card {
+  @apply p-5;
+}
+
+/* Ajustes dentro de la tarjeta: el estado respira menos. */
+.tool-card .status {
+  @apply mt-3.5;
+}
+
+.btn--sm {
+  @apply px-3.5 py-2 text-[13px];
+}
+
+/* --- Estado vacío: qué puedo hacer --------------------------------------- */
+.mode-grid {
+  @apply mt-[18px] grid grid-cols-2 gap-3;
+}
+
+.mode-card {
+  @apply flex gap-3 rounded-card border border-line bg-surface p-[18px] transition-[border-color,background-color];
+}
+
+.mode-card:hover {
+  @apply bg-hover;
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+}
+
+.mode-card__icon {
+  @apply grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-accent;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.mode-card__body {
+  @apply flex min-w-0 flex-col gap-1;
+}
+
+.mode-card__title {
+  @apply text-sm font-semibold;
+}
+
+.mode-card__text {
+  @apply text-[12.8px] leading-[1.55] text-muted;
+}
+
+/* --- Opciones: indicador de selección ------------------------------------- */
+.option__radio {
+  @apply grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-2 border-line transition-colors;
+}
+
+.option--selected .option__radio {
+  @apply border-accent;
+}
+
+.option--selected .option__radio::after {
+  content: "";
+  @apply h-2 w-2 rounded-full bg-accent;
+}
+
+/* --- Estadísticas del perfil ---------------------------------------------- */
+/* Va encajada entre dos tarjetas (la del resultado y la de controles). Antes
+   sólo tenía `mt-3`: 12px arriba y 0px abajo, así que la de controles tocaba
+   las casillas. El margen doble las separa de las dos. */
+.stat-grid {
+  @apply my-5 grid grid-cols-4 gap-2.5;
+}
+
+.stat {
+  @apply rounded-ctl border border-line bg-surface-2 px-3.5 py-3 transition-colors;
+}
+
+.stat__value {
+  @apply text-[20px] font-bold tabular-nums;
+}
+
+.stat__label {
+  @apply mt-0.5 text-[11px] font-semibold tracking-[0.05em] text-muted uppercase;
+}
+
+@media (max-width: 560px) {
+  .mode-grid {
+    @apply grid-cols-1;
+  }
+  .stat-grid {
+    @apply grid-cols-2;
+  }
+  .tool-head {
+    @apply items-start;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Movimiento reducido
+   --------------------------------------------------------------------------
+   La barra de progreso indeterminada se anima en bucle sin fin y los menús y
+   botones funden con transiciones. Quien pide movimiento reducido no quiere
+   nada de eso: la animación infinita se para y el resto cambia de un golpe. */
+@media (prefers-reduced-motion: reduce) {
+  .progress__fill--indeterminate {
+    @apply animate-none;
+  }
+
+  *,
+  ::before,
+  ::after {
+    transition-duration: 1ms !important;
+  }
+}
