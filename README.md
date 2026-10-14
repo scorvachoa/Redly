@@ -199,10 +199,9 @@ párrafos y las listas de `/privacidad` (`.doc p`, `.doc li`, `.doc__lead`) se
 limitan a `72ch`. Las tarjetas y los formularios sí ocupan el ancho completo.
 Los títulos no se limitan.
 
-El botón de GitHub apunta a `REPO_URL` (`lib/site.ts`). Está **vacío a
-propósito**: el proyecto todavía no es un repositorio publicado y no se
-inventan URLs. Cuando exista, basta con rellenarlo y el enlace aparece solo en
-la portada y en el pie.
+El botón de GitHub apunta a `REPO_URL` (`lib/site.ts`), con el repositorio
+público del proyecto. Con valor, el enlace aparece solo en la portada y en el
+pie; vacía, no se muestra ninguno.
 
 ### Descargador de TikTok
 
