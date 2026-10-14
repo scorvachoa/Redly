@@ -3,8 +3,12 @@
 /**
  * Panel de resultado para un vídeo suelto.
  *
- * Presentacional: recibe el resultado y dos callbacks. No tiene estado propio
+ * Presentacional: recibe el resultado y cuatro callbacks. No tiene estado propio
  * salvo el foco de teclado de las tarjetas de opción, que es puramente visual.
+ *
+ * Una publicación de fotos de TikTok (carrusel) devuelve una opción por imagen,
+ * con miniatura propia. Se pintan como galería con descarga individual y
+ * «Descargar todas»; las calidades de vídeo/audio siguen en su lista de siempre.
  */
 
 import { Download } from "@/components/icons";
@@ -20,7 +24,9 @@ export interface VideoPanelProps {
   busy: boolean;
   destination: Destination;
   onSelect: (index: number) => void;
-  onDownload: () => void;
+  onDownloadOption: (index: number) => void;
+  onDownloadPhotos: () => void;
+  onReset: () => void;
 }
 
 export default function VideoPanel({
@@ -29,8 +35,21 @@ export default function VideoPanel({
   busy,
   destination,
   onSelect,
-  onDownload,
+  onDownloadOption,
+  onDownloadPhotos,
+  onReset,
 }: VideoPanelProps) {
+  // Cada opción conserva su índice original: el selector de calidades no debe
+  // renumerarse cuando delante hay fotos.
+  const photos = result.downloads
+    .map((option, index) => ({ option, index }))
+    .filter((entry) => entry.option.kind === "image");
+  const mediaOptions = result.downloads
+    .map((option, index) => ({ option, index }))
+    .filter((entry) => entry.option.kind !== "image");
+
+  const selectedOption = result.downloads[selected];
+
   return (
     <>
       <div className="card result">
@@ -44,42 +63,92 @@ export default function VideoPanel({
               ID <b>{result.videoId ?? "—"}</b>
             </span>
             <span>
-              Opciones <b>{result.downloads.length}</b>
+              {photos.length > 0 ? "Fotos" : "Opciones"}{" "}
+              <b>{photos.length > 0 ? photos.length : result.downloads.length}</b>
             </span>
           </div>
         </div>
       </div>
 
-      <div className="section-title">Opciones de descarga</div>
-      <div className="options">
-        {result.downloads.map((option, index) => (
-          <div
-            key={`${option.url}-${index}`}
-            className={`card option${selected === index ? " option--selected" : ""}`}
-            onClick={() => onSelect(index)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") onSelect(index);
-            }}
-          >
-            <span className="option__radio" aria-hidden="true" />
-            <span className="option__name">{option.name}</span>
-            <span className="option__badge">{optionLabel(option)}</span>
+      {photos.length > 0 && (
+        <>
+          <div className="list-head">
+            <div className="section-title">
+              {photos.length} foto{photos.length === 1 ? "" : "s"}
+            </div>
+            <div className="list-head__actions">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={onDownloadPhotos}
+                disabled={busy}
+              >
+                <Download size={14} aria-hidden="true" /> Descargar todas
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
+
+          <div className="photos">
+            {photos.map(({ option, index }, position) => (
+              <div className="card photo" key={`${option.url}-${index}`}>
+                <span className="photo__thumb">
+                  {option.thumbnail ? <img src={option.thumbnail} alt="" /> : "Foto"}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm photo__btn"
+                  onClick={() => onDownloadOption(index)}
+                  disabled={busy}
+                  aria-label={`Descargar foto ${position + 1}`}
+                >
+                  <Download size={13} aria-hidden="true" /> {position + 1}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {mediaOptions.length > 0 && (
+        <>
+          <div className="section-title">Opciones de descarga</div>
+          <div className="options">
+            {mediaOptions.map(({ option, index }) => (
+              <div
+                key={`${option.url}-${index}`}
+                className={`card option${selected === index ? " option--selected" : ""}`}
+                onClick={() => onSelect(index)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") onSelect(index);
+                }}
+              >
+                <span className="option__radio" aria-hidden="true" />
+                <span className="option__name">{option.name}</span>
+                <span className="option__badge">{optionLabel(option)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="card download-bar">
         <div className="actions">
           <button
             type="button"
             className="btn btn--primary"
-            onClick={onDownload}
-            disabled={busy}
+            onClick={() => onDownloadOption(selected)}
+            disabled={busy || !selectedOption || selectedOption.kind === "image"}
           >
             <Download size={15} aria-hidden="true" /> Descargar
-            {result.downloads[selected] ? ` · ${optionLabel(result.downloads[selected])}` : ""}
+            {selectedOption && selectedOption.kind !== "image"
+              ? ` · ${optionLabel(selectedOption)}`
+              : ""}
+          </button>
+
+          <button type="button" className="btn btn--ghost" onClick={onReset} disabled={busy}>
+            Limpiar
           </button>
 
           <DestinationRow destination={destination} busy={busy} />

@@ -71,3 +71,55 @@ describe("parseSearchHtml con HTML vacío o roto", () => {
     expect(parseSearchHtml("<<<>>> &&&").downloads).toHaveLength(0);
   });
 });
+
+describe("parseSearchHtml con un carrusel de fotos (photomode)", () => {
+  const PHOTO_FIXTURE = fileURLToPath(
+    new URL("./fixtures/savetik_photo_post.html", import.meta.url),
+  );
+  const photoResult = parseSearchHtml(readFileSync(PHOTO_FIXTURE, "utf8"));
+  const photos = photoResult.downloads.filter((option) => option.kind === "image");
+
+  it("extrae ID y título del carrusel", () => {
+    expect(photoResult.videoId).toBe("7591041242947947831");
+    expect(photoResult.title).toBe("Carrusel de prueba");
+  });
+
+  it("cada foto es una opción propia, por delante del MP3", () => {
+    expect(photos).toHaveLength(2);
+    // Las fotos se añaden primero para que `pickAutoOption` prefiera la imagen
+    // cuando el post no lleva ningún MP4.
+    expect(photoResult.downloads[0].kind).toBe("image");
+    expect(photoResult.downloads[1].kind).toBe("image");
+    expect(photoResult.downloads[2].format).toBe("mp3");
+    expect(photoResult.downloads[2].kind).toBe("audio");
+  });
+
+  it("marca cada foto como imagen y conserva su miniatura", () => {
+    expect(photos).toHaveLength(2);
+    for (const photo of photos) {
+      expect(photo.kind).toBe("image");
+      expect(photo.format).toBe("jpeg");
+      expect(photo.thumbnail).toMatch(
+        /^https:\/\/p16-common-sign\.tiktokcdn-us\.com\/photo-/,
+      );
+    }
+  });
+
+  it("lee la extensión del nombre del token, o la infiere del contexto", () => {
+    // El primer token es un JWT válido con `filename: SaveTikPro.com_..._1.jpeg`.
+    expect(photos[0].url).toContain("HDR.");
+    expect(photos[0].format).toBe("jpeg");
+    // El segundo es un token corrupto: sin payload decodificable se cae a la
+    // extensión que toca por contexto.
+    expect(photos[1].url).toContain("token=rototo");
+    expect(photos[1].format).toBe("jpeg");
+  });
+
+  it("sólo admite enlaces de la allowlist del CDN de descarga", () => {
+    expect(
+      photoResult.downloads.every((option) =>
+        option.url.startsWith("https://pro.snapcdn.app/"),
+      ),
+    ).toBe(true);
+  });
+});

@@ -14,11 +14,13 @@ import {
   DOWNLOAD_TEXT_PATTERN,
   EXCLUDED_DOWNLOAD_CLASSES,
   FORMAT_PATTERN,
+  PHOTO_DOWNLOAD_SELECTOR,
+  PHOTO_THUMB_SELECTOR,
   SELECTORS,
   TIKTOK_VIDEO_ID_PATTERN,
   TIKVID_BASE_URL,
 } from "./config";
-import type { DownloadOption, TikTokResult } from "./models";
+import { kindFromFormat, type DownloadOption, type TikTokResult } from "./models";
 
 const WHITESPACE_RE = /\s+/g;
 
@@ -120,28 +122,66 @@ function extractVideoId($: cheerio.CheerioAPI): string | null {
 // Opciones de descarga
 // ---------------------------------------------------------------------------
 function extractDownloads($: cheerio.CheerioAPI): DownloadOption[] {
-  const anchors = collectDownloadAnchors($);
   const options: DownloadOption[] = [];
   const seen = new Set<string>();
 
-  for (const anchor of anchors) {
+  const add = (anchor: AnyNode, fallbackFormat: string | null, thumbnail: string | null) => {
     const el = $(anchor);
     const rawHref = hrefOf(el);
-    if (!rawHref) continue;
+    if (!rawHref) return;
     const url = absoluteUrl(rawHref);
-    if (seen.has(url)) continue;
+    if (seen.has(url)) return;
     seen.add(url);
 
     const name = cleanText(el.text()) || "Download";
+    const format = inferFormat(name, url, fallbackFormat);
     options.push({
       name,
       url,
-      format: inferFormat(name, url),
+      format,
       quality: inferQuality(name),
+      kind: kindFromFormat(format),
+      thumbnail,
     });
+  };
+
+  // Las fotos van primero: `pickAutoOption` (CLI) elige la primera opción cuando
+  // no encuentra MP4, y en un carrusel eso debe ser una imagen, no el MP3.
+  for (const anchor of collectPhotoAnchors($)) {
+    add(anchor, "jpeg", photoThumbnail($, anchor));
+  }
+  for (const anchor of collectDownloadAnchors($)) {
+    add(anchor, null, null);
   }
 
   return options;
+}
+
+/**
+ * Botones «Download Photo» de una publicación de carrusel.
+ *
+ * Van en `.photo-list`, con clase `abutton` (no `tik-button-dl`), así que el
+ * selector principal no los ve nunca: se recolectan aparte.
+ */
+function collectPhotoAnchors($: cheerio.CheerioAPI): AnyNode[] {
+  try {
+    return $(PHOTO_DOWNLOAD_SELECTOR)
+      .toArray()
+      .filter((anchor) => isDownloadAnchor($, anchor));
+  } catch {
+    return [];
+  }
+}
+
+/** Miniatura de la foto: vive en un `<div>` hermano del botón, dentro del `<li>`. */
+function photoThumbnail($: cheerio.CheerioAPI, anchor: AnyNode): string | null {
+  const li = $(anchor).closest("li");
+  const context = li.length > 0 ? li : $(anchor).parent();
+  const raw = context.find(PHOTO_THUMB_SELECTOR).first().attr("src");
+  if (!raw) return null;
+  const value = raw.trim();
+  if (!value || value.startsWith("data:")) return null;
+  return absoluteUrl(value);
 }
 
 function collectDownloadAnchors($: cheerio.CheerioAPI): AnyNode[] {
@@ -204,16 +244,42 @@ function hrefOf(el: Cheerio<AnyNode>): string | null {
 // ---------------------------------------------------------------------------
 // Formato y calidad a partir del texto del botón
 // ---------------------------------------------------------------------------
-function inferFormat(name: string, url: string): string | null {
+const MEDIA_EXTENSIONS = ["mp4", "mp3", "m4a", "aac", "webm", "wav", "jpg", "jpeg", "png", "webp"];
+
+function inferFormat(name: string, url: string, fallback: string | null = null): string | null {
   const match = FORMAT_PATTERN.exec(name);
   if (match) return match[1].toLowerCase();
   const lowered = url.toLowerCase();
-  for (const candidate of ["mp4", "mp3", "m4a", "aac", "webm", "wav"]) {
+  for (const candidate of MEDIA_EXTENSIONS) {
     if (lowered.includes(`.${candidate}`)) return candidate;
   }
   if (lowered.includes("mime_type=video")) return "mp4";
   if (lowered.includes("mime_type=audio")) return "mp3";
-  return null;
+  // Los tokens de SnapCDN no llevan extensión en la URL: el nombre real va
+  // dentro del payload del JWT. Si tampoco está, manda el formato del contexto.
+  return extensionOfSnapToken(url) ?? fallback;
+}
+
+/**
+ * Lee el campo `filename` del payload JWT de SnapCDN.
+ *
+ * El token es base64url en tres partes; sólo se decodifica el payload para leer
+ * el nombre que el servicio ya ha hecho público en la respuesta. No se verifica
+ * la firma (no hace falta: se usa tal cual se recibe y caduca en ~1 h).
+ */
+function extensionOfSnapToken(url: string): string | null {
+  try {
+    const token = new URL(url).searchParams.get("token");
+    if (!token) return null;
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(atob(normalized)) as { filename?: string };
+    const match = /\.([a-z0-9]{2,5})$/i.exec(decoded.filename ?? "");
+    return match ? match[1].toLowerCase() : null;
+  } catch {
+    return null;
+  }
 }
 
 function inferQuality(name: string): string | null {

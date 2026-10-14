@@ -20,7 +20,7 @@ import {
   Video,
 } from "@/components/icons";
 import { PLATFORMS, isReady, type PlatformKind } from "@/lib/platforms";
-import { REPO_URL } from "@/lib/site";
+import { DESKTOP_DOWNLOAD_URL, REPO_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Red.ly — Descarga y transcripción de vídeos públicos",
@@ -220,8 +220,8 @@ export default function WelcomePage() {
             <div>
               <div className="section-title">Obtener programa</div>
               <p className="landing-section__lead">
-                La web funciona sin instalar nada. Si prefieres la terminal, o esperas
-                un programa de escritorio, esto es lo que hay hoy y lo que se plantea.
+                La web funciona sin instalar nada. Si prefieres la terminal, o un
+                programa propio para Windows, esto es lo que hay.
               </p>
             </div>
           </div>
@@ -283,41 +283,52 @@ export default function WelcomePage() {
               ) : null}
             </article>
 
-            <article className="program-card">
+            <article className="program-card program-card--ready">
               <header className="program-card__head">
                 <span className="program-card__icon" aria-hidden="true">
                   <Video size={18} focusable="false" />
                 </span>
                 <div className="program-card__id">
                   <div className="program-card__name">App de escritorio</div>
-                  <div className="program-card__meta">Sin navegador</div>
+                  <div className="program-card__meta">Windows · sin Python ni Node.js</div>
                 </div>
-                <span className="pill">Próximamente</span>
+                <span className="pill pill--ready">Disponible</span>
               </header>
 
               <p className="program-card__text">
-                La misma funcionalidad empaquetada como programa propio. Todavía no
-                existe: esto es lo que se plantea, y no se publica nada hasta que
-                funcione de verdad.
+                El mismo trabajo fuera del navegador: un único ejecutable que
+                analiza un vídeo o un perfil completo y lo descarga en lote, con
+                la cola corriendo en segundo plano.
               </p>
 
-              <ul className="program-list program-list--muted">
+              <ul className="program-list">
                 <li>
                   <FolderOpen size={15} aria-hidden="true" focusable="false" />
-                  Elegir la carpeta de destino con el diálogo del sistema operativo.
+                  Carpeta de destino elegida con el diálogo del sistema.
+                </li>
+                <li>
+                  <ListUl size={15} aria-hidden="true" focusable="false" />
+                  Perfil completo: selección con casillas y descarga en lote.
+                </li>
+                <li>
+                  <RotateRight size={15} aria-hidden="true" focusable="false" />
+                  Reanudación con historial si se corta o se cierra el programa.
                 </li>
                 <li>
                   <LayerGroup size={15} aria-hidden="true" focusable="false" />
-                  Cola de descargas en segundo plano, fuera de la pestaña del navegador.
-                </li>
-                <li>
-                  <Terminal size={15} aria-hidden="true" focusable="false" />
-                  Sin instalar Node.js a mano ni depender de la terminal.
+                  La ventana nunca se bloquea: todo corre en hilos secundarios.
                 </li>
               </ul>
 
-              <p className="program-card__note">
-                Cuando esté lista, el enlace de descarga aparecerá aquí mismo.
+              <a href={DESKTOP_DOWNLOAD_URL} className="btn btn--primary">
+                <Download size={16} focusable="false" />
+                Descargar para Windows
+              </a>
+
+              <p className="program-card__note mt-4">
+                Un archivo único, sin instalador. Windows puede avisar la primera
+                vez porque no está firmado: pulsa «Más información» y luego
+                «Ejecutar de todas formas».
               </p>
             </article>
 

@@ -142,13 +142,24 @@ export const SELECTORS = {
     "input[id*='video' i]",
   ],
   downloadPrimary: ["a.tik-button-dl", ".dl-action a[href]", ".download a[href]", "a[download]"],
-  downloadHrefHosts: ["dl.snapcdn.app", "tiktokcdn", "tokcdn", "tik-cdn"],
+  downloadHrefHosts: ["dl.snapcdn.app", "snapcdn.app", "tiktokcdn", "tokcdn", "tik-cdn"],
 } as const;
 
 export const DOWNLOAD_TEXT_PATTERN =
   /\bdownload\b.*\b(mp4|mp3|m4a|aac|wav|webm|video|audio)\b/i;
-export const FORMAT_PATTERN = /\b(mp4|mp3|m4a|aac|wav|webm)\b/i;
+/** Formatos de archivo reconocidos: vídeo, audio **e imagen** (carruseles). */
+export const FORMAT_PATTERN = /\b(mp4|mp3|m4a|aac|wav|webm|jpg|jpeg|png|webp)\b/i;
 export const TIKTOK_VIDEO_ID_PATTERN = /tiktok\.com\/@[^/\s]+\/video\/(\d{6,25})/i;
+
+/**
+ * Botones de una publicación de fotos.
+ *
+ * No son `tik-button-dl`, así que el selector principal (que se detiene en el
+ * primer grupo no vacío) nunca los alcanza: se recolectan aparte y se concatenan.
+ */
+export const PHOTO_DOWNLOAD_SELECTOR = ".photo-list .download-items__btn a[href]";
+/** Miniatura de cada foto, hermana del botón dentro del mismo `<li>`. */
+export const PHOTO_THUMB_SELECTOR = ".download-items__thumb img";
 
 /** Enlaces de navegación (no de archivo) que hay que excluir del parser. */
 export const EXCLUDED_DOWNLOAD_CLASSES = ["more-video", "close", "popup"];
@@ -180,7 +191,7 @@ export const PROFILE_SELECTORS = {
 } as const;
 
 /** Extensiones de archivo reconocidas en el nombre del enlace de descarga. */
-export const PROFILE_FORMAT_PATTERN = /\.(mp4|mp3|m4a|webm)\b/i;
+export const PROFILE_FORMAT_PATTERN = /\.(mp4|mp3|m4a|webm|jpe?g|png|webp)\b/i;
 /** Un id de vídeo de TikTok embebido en el nombre o en la URL. */
 export const PROFILE_VIDEO_ID_PATTERN = /(\d{10,25})/;
 

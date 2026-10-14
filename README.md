@@ -450,6 +450,11 @@ Cómo funciona:
   porque la URL de un vídeo no lleva el autor.
 * En modo vídeo suelto, la búsqueda intenta primero SavTikPro y cae a TikVid
   automáticamente (`searchAny`).
+* **Sólo vídeo y audio.** El listado de SavTikPro no incluye las publicaciones
+  de fotos, y cada tarjeta trae un único enlace directo: el lote escribe **un
+  archivo por ítem** (`resolveUrl` + `downloadToFile`) y no expande carruseles.
+  Para fotos hay que analizar la URL del post suelto (galería + «Descargar
+  todas»). Ver «Parsing» → «Publicaciones de fotos».
 
 ---
 
@@ -659,14 +664,38 @@ ejecución:
 * **Thumbnail**: `div.thumbnail img` → `div.image-tik img` → `video[poster]` → primer `img`
 * **Video ID**: `input#TikTokId` → enlaces `tiktok.com/@user/video/<id>` → atributos `data-*`
 * **Opciones**: `a.tik-button-dl` → `.dl-action a[href]` → enlaces con hosts de CDN
+* **Fotos (carrusel)**: `.photo-list .download-items__btn a[href]`, un enlace
+  por imagen, con su miniatura en `.download-items__thumb img`
 
 Se excluyen enlaces de navegación y se deduplican las URLs repetidas.
 
-| Botón | `format` | `quality` |
-| --- | --- | --- |
-| `Download MP4` | `mp4` | `standard` |
-| `Download MP4 HD` | `mp4` | `hd` |
-| `Download MP3` | `mp3` | `audio` |
+| Botón | `format` | `quality` | `kind` |
+| --- | --- | --- | --- |
+| `Download MP4` | `mp4` | `standard` | `video` |
+| `Download MP4 HD` | `mp4` | `hd` | `video` |
+| `Download Photo` | `jpeg` | — | `image` |
+| `Download MP3` | `mp3` | `audio` | `audio` |
+
+### Publicaciones de fotos (carrusel)
+
+Las publicaciones de fotos de TikTok (`photomode`) traen un botón por imagen
+en lugar de calidades de vídeo. Se añaden **por delante** de las demás
+opciones, de modo que cuando el post no lleva ningún MP4, `pickAutoOption`
+elige la imagen en lugar de caer al MP3. Cada opción de foto conserva su
+miniatura propia.
+
+La extensión se lee del campo `filename` del JWT de `pro.snapcdn.app`
+(`SaveTikPro.com_<id>_<n>.jpeg`); si el token no es un JWT legible, se cae a
+`jpeg` por contexto.
+
+En la web se presentan como galería con descarga individual y «Descargar
+todas». El nombre va numerado (`Redly_<id>_<n>.jpeg`) para que no se pisen,
+y el historial usa una clave por foto (`<id>#<n>`).
+
+> **Sólo por URL de post.** El listado de perfil de SavTikPro **no incluye**
+> las publicaciones de fotos (verificado el 2026-10-14: 232 tarjetas reales de
+> 4 perfiles, 0 con miniatura `photomode` y 0 con extensión distinta de
+> `mp4`), así que el lote de perfil nunca las verá. Ver «Limitaciones».
 
 ---
 
@@ -806,6 +835,10 @@ en DevTools si realmente se llama, con qué método, payload y respuesta
   marca el vídeo como fallo y la siguiente ejecución lo reintenta con uno fresco.
 * El listado de perfil depende de SavTikPro: si cambia el `next_cursor` o las
   clases de las tarjetas, habrá que ajustar `lib/savetik.ts`.
+* Las **publicaciones de fotos** (carrusel) sólo se pueden descargar analizando
+  su URL individual: el listado de perfil de SavTikPro **no las incluye** y el
+  lote de perfil escribe un solo archivo por tarjeta (ver «Parsing» →
+  «Publicaciones de fotos»).
 * El scraping directo de `tiktok.com/@usuario` **no está implementado** (WAF).
 * Sólo se soporta **TikTok**. Las rutas `/download/{youtube,facebook,…}` y
   `/transcript/*` existen en la navegación pero muestran «Próximamente»: no hay

@@ -66,6 +66,31 @@ interface ProfilePageResponse {
   next_cursor?: string | number | null;
 }
 
+/**
+ * Nombre de archivo de una opción del resultado.
+ *
+ * En un carrusel se numeran las fotos (`Redly_<id>_3.jpeg`): sin el índice,
+ * todas acabarían con el mismo nombre y se pisarían en el destino.
+ */
+function optionFilename(
+  videoId: string | null | undefined,
+  option: DownloadOption,
+  photoIndex: number,
+  photoCount: number,
+): string {
+  const id = videoId && /^\d+$/.test(videoId) ? videoId : "video";
+  const isImage = option.kind === "image";
+  const suffix = isImage && photoCount > 1 ? `_${photoIndex + 1}` : "";
+  const extension = option.format ?? (isImage ? "jpeg" : "mp4");
+  return `Redly_${id}${suffix}.${extension}`;
+}
+
+/** Índice de la primera opción que no sea imagen (las calidades de vídeo/audio). */
+function firstMediaIndex(result: TikTokResult): number {
+  const index = result.downloads.findIndex((option) => option.kind !== "image");
+  return index === -1 ? 0 : index;
+}
+
 export default function Downloader({ platform }: { platform: Platform }) {
   const [url, setUrl] = useState("");
   const [mode, setMode] = useState<Mode>("idle");
@@ -104,6 +129,17 @@ export default function Downloader({ platform }: { platform: Platform }) {
     setProfileStats({ pending: 0, done: 0, pages: 0 });
     setProgress(IDLE_PROGRESS);
   }, []);
+
+  /**
+   * «Limpiar» del modo vídeo. `reset` sólo borra los datos, así que además se
+   * vuelve a `idle`: si no, el panel dejaría de pintarse (porque `result` es
+   * nulo) pero tampoco se mostrarían las tarjetas de modo.
+   */
+  const clearResult = useCallback(() => {
+    reset();
+    setMode("idle");
+    setStatus(DEFAULT_STATUS);
+  }, [reset]);
 
   const clearHistory = useCallback(() => {
     history.clear();
@@ -246,7 +282,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
         setResult(data.result);
         setMode("video");
         setThumb(data.result.thumbnail ?? null);
-        setSelected(0);
+        setSelected(firstMediaIndex(data.result));
         setStatus({ kind: "ok", text: `Listo · ${data.result.downloads.length} opción(es) encontradas` });
       }
     } catch (error) {
@@ -259,54 +295,133 @@ export default function Downloader({ platform }: { platform: Platform }) {
 
   // --- Descargas --------------------------------------------------------
 
-  const downloadOption = useCallback(async () => {
+  const downloadOption = useCallback(
+    async (index: number) => {
+      if (!result) return;
+      const option: DownloadOption | undefined = result.downloads[index];
+      if (!option) return;
+
+      const images = result.downloads.filter((item) => item.kind === "image");
+      const photoIndex = result.downloads
+        .slice(0, index)
+        .filter((item) => item.kind === "image").length;
+      const name = optionFilename(result.videoId, option, photoIndex, images.length);
+
+      setBusy(true);
+      setStatus({ kind: "info", text: option.kind === "image" ? "Descargando foto…" : "Descargando…" });
+      setProgress({ done: 0, total: null, label: "Conectando con el CDN…", indeterminate: true });
+
+      try {
+        const params = new URLSearchParams({ url: option.url, name });
+        const bytes = await downloadWithProgress(
+          `/api/download?${params.toString()}`,
+          name,
+          destination.makeSink,
+          (done, total) => {
+            setProgress({
+              done,
+              total,
+              label: progressLabel(done, total),
+              indeterminate: false,
+            });
+          },
+        );
+        if (result.videoId) {
+          history.mark(result.videoId, "ok", {
+            file: name,
+            bytes: bytes ?? undefined,
+            title: result.title ?? undefined,
+          });
+        }
+        setStatus({ kind: "ok", text: "Descarga completada" });
+        setProgress((p) => ({
+          ...p,
+          label: destination.dirHandle
+            ? `Guardado en ${destination.label}`
+            : "Guardado en Descargas",
+          indeterminate: false,
+        }));
+      } catch (error) {
+        setStatus({ kind: "error", text: (error as Error).message });
+        setProgress(IDLE_PROGRESS);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [result, destination, history],
+  );
+
+  /**
+   * Descarga las fotos de un carrusel una a una.
+   *
+   * Cada foto lleva su propia clave de historial (`<id>#<n>`): el manifiesto
+   * guarda por id, y con una sola clave todas se pisarían entre sí.
+   */
+  const downloadPhotos = useCallback(async () => {
     if (!result) return;
-    const option: DownloadOption | undefined = result.downloads[selected];
-    if (!option) return;
+    const photos = result.downloads.filter((option) => option.kind === "image");
+    if (photos.length === 0) return;
 
     setBusy(true);
-    setStatus({ kind: "info", text: "Descargando…" });
-    setProgress({ done: 0, total: null, label: "Conectando con el CDN…", indeterminate: true });
+    let completed = 0;
+    let failed = 0;
 
-    try {
-      const params = new URLSearchParams({ url: option.url });
-      const name = `Redly_${result.videoId ?? "video"}.${option.format ?? "mp4"}`;
-      params.set("name", name);
-      const bytes = await downloadWithProgress(
-        `/api/download?${params.toString()}`,
-        "Redly.mp4",
-        destination.makeSink,
-        (done, total) => {
-          setProgress({
-            done,
-            total,
-            label: progressLabel(done, total),
-            indeterminate: false,
+    for (let index = 0; index < photos.length; index++) {
+      const option = photos[index];
+      const name = optionFilename(result.videoId, option, index, photos.length);
+      setStatus({ kind: "info", text: `Descargando foto ${index + 1} de ${photos.length}…` });
+      setProgress({
+        done: 0,
+        total: null,
+        label: `${index + 1}/${photos.length} · ${name}`,
+        indeterminate: true,
+      });
+
+      try {
+        const params = new URLSearchParams({ url: option.url, name });
+        const bytes = await downloadWithProgress(
+          `/api/download?${params.toString()}`,
+          name,
+          destination.makeSink,
+          (done, total) => {
+            setProgress({
+              done,
+              total,
+              label: progressLabel(done, total, `${index + 1}/${photos.length}`),
+              indeterminate: false,
+            });
+          },
+        );
+        completed += 1;
+        if (result.videoId) {
+          history.mark(`${result.videoId}#${index + 1}`, "ok", {
+            file: name,
+            bytes,
+            title: result.title ?? undefined,
           });
-        },
-      );
-      if (result.videoId) {
-        history.mark(result.videoId, "ok", {
-          file: name,
-          bytes: bytes ?? undefined,
-          title: result.title ?? undefined,
-        });
+        }
+      } catch {
+        failed += 1;
       }
-      setStatus({ kind: "ok", text: "Descarga completada" });
-      setProgress((p) => ({
-        ...p,
-        label: destination.dirHandle
-          ? `Guardado en ${destination.label}`
-          : "Guardado en Descargas",
-        indeterminate: false,
-      }));
-    } catch (error) {
-      setStatus({ kind: "error", text: (error as Error).message });
-      setProgress(IDLE_PROGRESS);
-    } finally {
-      setBusy(false);
+
+      // Misma pausa que en el lote de perfil: no golpear al CDN.
+      if (index < photos.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_PAUSE_MS));
+      }
     }
-  }, [result, selected, destination, history]);
+
+    setBusy(false);
+    setStatus({
+      kind: failed === 0 ? "ok" : "error",
+      text: `Fotos terminadas · ${completed} descargada(s) · ${failed} fallo(s)`,
+    });
+    setProgress({
+      done: 0,
+      total: null,
+      label: destination.dirHandle ? `Guardadas en ${destination.label}` : "Guardadas en Descargas",
+      indeterminate: false,
+    });
+  }, [result, destination, history]);
 
   const downloadAll = useCallback(async () => {
     const queue = items.filter((item) => checkedIds.has(item.id));
@@ -509,7 +624,9 @@ export default function Downloader({ platform }: { platform: Platform }) {
             busy={busy}
             destination={destination}
             onSelect={setSelected}
-            onDownload={() => void downloadOption()}
+            onDownloadOption={(index) => void downloadOption(index)}
+            onDownloadPhotos={() => void downloadPhotos()}
+            onReset={clearResult}
           />
         )}
 

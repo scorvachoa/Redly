@@ -5,16 +5,37 @@
  * librería de validación) porque los datos ya vienen de fuentes conocidas.
  */
 
+/** Tipo de medio de una opción. Las publicaciones de fotos de TikTok devuelven imágenes. */
+export type MediaKind = "video" | "audio" | "image";
+
+/** Formatos que se consideran imagen (carrusel de TikTok, `photomode`). */
+const IMAGE_FORMATS = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic", "avif"]);
+/** Formatos que se consideran sólo audio. */
+const AUDIO_FORMATS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
+
+/** Deduce el tipo de medio a partir del formato ya detectado. */
+export function kindFromFormat(format: string | null | undefined): MediaKind {
+  const value = (format ?? "").toLowerCase();
+  if (IMAGE_FORMATS.has(value)) return "image";
+  if (AUDIO_FORMATS.has(value)) return "audio";
+  return "video";
+}
+
 /** Una opción de descarga ofrecida por el servicio. */
 export interface DownloadOption {
   name: string;
   url: string;
   format?: string | null;
   quality?: string | null;
+  /** `image` en publicaciones de carrusel; el resto es vídeo o audio. */
+  kind?: MediaKind | null;
+  /** Miniatura de la foto (sólo en publicaciones de fotos). */
+  thumbnail?: string | null;
 }
 
 /** Etiqueta corta para la UI, por ejemplo `MP4 HD`. */
 export function optionLabel(option: DownloadOption): string {
+  if (option.kind === "image") return (option.format ?? "JPEG").toUpperCase();
   const parts = [option.format ? option.format.toUpperCase() : "OPCION"];
   if (option.quality && option.quality !== "standard") {
     parts.push(option.quality.toUpperCase());

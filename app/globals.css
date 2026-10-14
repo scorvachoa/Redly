@@ -465,6 +465,40 @@ a {
 }
 
 /* --------------------------------------------------------------------------
+   Galería de fotos (publicaciones de carrusel de TikTok)
+   -------------------------------------------------------------------------- */
+/* Cada imagen trae su propio botón; la cabecera (`.list-head`, que ya pone sus
+   márgenes) ofrece «Descargar todas». Las miniaturas son cuadradas para que la
+   rejilla no se desalinee con fotos de distinto recorte. */
+.photos {
+  @apply mt-0 grid grid-cols-4 gap-3;
+}
+
+/* `.card` no lleva padding por sí mismo: lo pone cada tarjeta. */
+.photo {
+  @apply flex flex-col gap-2 p-2;
+}
+
+.photo__thumb {
+  @apply block aspect-square overflow-hidden rounded-card border border-line bg-entry;
+}
+
+.photo__thumb img {
+  @apply h-full w-full object-cover;
+}
+
+/* Ocupa el ancho de la celda: es la acción de la tarjeta. */
+.photo__btn {
+  @apply w-full;
+}
+
+@media (max-width: 560px) {
+  .photos {
+    @apply grid-cols-3;
+  }
+}
+
+/* --------------------------------------------------------------------------
    Lista de perfil (modo lote)
    -------------------------------------------------------------------------- */
 /* Cabecera de la lista: el título a la izquierda y las acciones de selección
