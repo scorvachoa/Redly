@@ -16,7 +16,7 @@ const STACK: Array<{ name: string; what: string }> = [
   },
   {
     name: "TypeScript",
-    what: "Todo el código, incluida la CLI.",
+    what: "Todo el código, de la interfaz a la API.",
   },
   {
     name: "Tailwind CSS",
@@ -29,10 +29,6 @@ const STACK: Array<{ name: string; what: string }> = [
   {
     name: "Vitest",
     what: "Suite de tests, ejecutable sin conexión a Internet.",
-  },
-  {
-    name: "Commander y Picocolors",
-    what: "Argumentos, salida y color de la CLI.",
   },
 ];
 
@@ -50,11 +46,11 @@ export default function CreditsPage() {
 
         <h2>Origen del proyecto</h2>
         <p>
-          La web y la CLI son el port a TypeScript de un prototipo escrito en Python
+          La web es el port a TypeScript de un prototipo escrito en Python
           que implementaba el mismo flujo HTTP. De ahí salen las decisiones que hoy
           estructuran el proyecto: paginación por cursor, historial local de
-          descargas, manifiesto de reanudación y una lista de fuentes comprobadas
-          empíricamente antes de usarlas.
+          descargas y una lista de fuentes comprobadas empíricamente antes de
+          usarlas.
         </p>
 
         <h2>Tecnologías</h2>

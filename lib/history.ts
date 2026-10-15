@@ -1,14 +1,13 @@
 /**
  * Historial de descargas: evita repetir vídeos ya bajados.
  *
- * Mismo contrato que el manifiesto de la CLI (`lib/batch.ts`) pero con un
- * *storage adapter* inyectable, para poder usarse:
+ * Guarda el historial detrás de un *storage adapter* inyectable:
  *
  * - en el navegador con `localStorage` (donde no hay sistema de archivos),
- * - en la CLI o en tests con cualquier otro almacén (doble en memoria).
+ * - en tests con un doble en memoria.
  *
- * Reglas, iguales que el manifiesto: se guarda **sólo** estado, nombre de
- * archivo, bytes y título — **nunca URLs ni tokens**, que caducan en ~1 hora.
+ * Se guarda **sólo** estado, nombre de archivo, bytes y título — **nunca URLs
+ * ni tokens**, que caducan en ~1 hora.
  *
  * Nota: este módulo no importa `node:*` para que el bundler del navegador lo
  * pueda incluir sin arrastrar runtime de Node.
@@ -154,7 +153,7 @@ export class History {
 /**
  * Separa la cola en pendientes y ya descargados, conservando el orden.
  *
- * `skip` a `false` devuelve la cola entera (equivalente a `--no-resume`).
+ * `skip` a `false` devuelve la cola entera, sin filtrar nada.
  */
 export function partitionByHistory<T extends { id: string }>(
   items: T[],

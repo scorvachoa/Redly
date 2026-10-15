@@ -87,13 +87,6 @@ export default function PrivacyPage() {
           procesa. No se registra en un almacén persistente.
         </p>
 
-        <h2>La CLI</h2>
-        <p>
-          La versión de terminal funciona igual: escribe un <code>manifest.json</code> en
-          la carpeta de salida para reanudar lotes, y ese archivo tampoco contiene URLs ni
-          tokens, sólo ids, rutas y estados. Es tuyo y lo puedes borrar.
-        </p>
-
         <h2>Servicios de terceros</h2>
         <p>
           El contenido sale de servicios de terceros a los que Red.ly hace peticiones.

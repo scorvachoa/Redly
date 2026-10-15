@@ -9,23 +9,21 @@ import {
   Bolt,
   Download,
   FolderOpen,
-  FolderTree,
   LayerGroup,
   Link as LinkIcon,
   ListUl,
   Lock,
   RotateRight,
   ShieldHalved,
-  Terminal,
   Video,
 } from "@/components/icons";
 import { PLATFORMS, isReady, type PlatformKind } from "@/lib/platforms";
-import { DESKTOP_DOWNLOAD_URL, REPO_URL } from "@/lib/site";
+import { DESKTOP_DOWNLOAD_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Red.ly — Descarga y transcripción de vídeos públicos",
   description:
-    "Cliente web y CLI en TypeScript para descargar y transcribir vídeos públicos de TikTok, YouTube, Facebook e Instagram.",
+    "Cliente web en TypeScript para descargar y transcribir vídeos públicos de TikTok, YouTube, Facebook e Instagram.",
 };
 
 const FEATURES = [
@@ -37,17 +35,12 @@ const FEATURES = [
   {
     icon: RotateRight,
     title: "Reanudación real",
-    text: "Un manifiesto recuerda lo ya bajado. Si se corta, vuelves a lanzar y continúa donde estaba.",
+    text: "El historial recuerda lo ya bajado: si se corta, vuelves a lanzar y continúa donde estaba.",
   },
   {
     icon: FolderOpen,
     title: "Carpeta por perfil",
     text: "Cada perfil se guarda en su propia subcarpeta. En el navegador puedes elegir el destino.",
-  },
-  {
-    icon: Terminal,
-    title: "También en terminal",
-    text: "Mismo núcleo en la CLI: lotes, pausas, reintentos y salida limpia para usar en scripts.",
   },
   {
     icon: ShieldHalved,
@@ -119,20 +112,17 @@ export default function WelcomePage() {
           </h1>
           <p className="hero__text">
             Red.ly analiza una URL, resuelve el archivo en el CDN y te lo guarda donde elijas.
-            Funciona en el navegador y en la terminal, con historial para no repetir descargas.
+            Funciona en el navegador, con historial local para no repetir descargas.
           </p>
           <div className="hero__actions">
             <div className="hero__actions-main">
-              <Link href="/download/tiktok" className="btn btn--primary btn--lg">
-                Descargar de TikTok
-              </Link>
+              <a href="#obtener-programa" className="btn btn--primary btn--lg">
+                Obtener programa
+              </a>
               <a href="#plataformas" className="btn btn--ghost btn--lg">
                 Ver plataformas
               </a>
             </div>
-            <a href="#obtener-programa" className="btn btn--ghost btn--lg hero__actions-side">
-              Obtener programa
-            </a>
           </div>
           <div className="hero__stats">
             <span>
@@ -144,7 +134,7 @@ export default function WelcomePage() {
             </span>
             <span className="hero__stats-sep" />
             <span>
-              <b>CLI</b> incluida
+              <b>PWA</b> instalable
             </span>
           </div>
         </section>
@@ -220,68 +210,13 @@ export default function WelcomePage() {
             <div>
               <div className="section-title">Obtener programa</div>
               <p className="landing-section__lead">
-                La web funciona sin instalar nada. Si prefieres la terminal, o un
-                programa propio para Windows, esto es lo que hay.
+                La web funciona sin instalar nada. Si prefieres un programa
+                propio para Windows, esto es lo que hay.
               </p>
             </div>
           </div>
 
           <div className="program-grid">
-            <article className="program-card program-card--ready">
-              <header className="program-card__head">
-                <span className="program-card__icon" aria-hidden="true">
-                  <Terminal size={18} focusable="false" />
-                </span>
-                <div className="program-card__id">
-                  <div className="program-card__name">CLI de Red.ly</div>
-                  <div className="program-card__meta">Node.js · terminal</div>
-                </div>
-                <span className="pill pill--ready">Disponible</span>
-              </header>
-
-              <p className="program-card__text">
-                El mismo núcleo que la web, ejecutado desde la terminal. Es la opción
-                para lotes largos y para encadenar descargas en un script.
-              </p>
-
-              <ul className="program-list">
-                <li>
-                  <LayerGroup size={15} aria-hidden="true" focusable="false" />
-                  Un perfil entero en una sola orden, paginando el listado.
-                </li>
-                <li>
-                  <RotateRight size={15} aria-hidden="true" focusable="false" />
-                  Reanudación: si se corta, vuelves a lanzar y continúa donde estaba.
-                </li>
-                <li>
-                  <FolderTree size={15} aria-hidden="true" focusable="false" />
-                  Carpeta propia por perfil dentro del directorio de salida.
-                </li>
-                <li>
-                  <ListUl size={15} aria-hidden="true" focusable="false" />
-                  Pausas y reintentos configurables para no saturar el origen.
-                </li>
-                <li>
-                  <Bolt size={15} aria-hidden="true" focusable="false" />
-                  Salida limpia y legible, pensada para leerla o registrarla.
-                </li>
-              </ul>
-
-              <pre className="program-code">
-                <code>npm install{"\n"}npm run cli -- --help</code>
-              </pre>
-
-              {REPO_URL ? (
-                <a
-                  href={REPO_URL}
-                  className="btn btn--primary"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Ver el código
-                </a>
-              ) : null}
-            </article>
 
             <article className="program-card program-card--ready">
               <header className="program-card__head">
@@ -332,7 +267,7 @@ export default function WelcomePage() {
               </p>
             </article>
 
-            <article className="program-card program-card--ready program-card--install">
+            <article className="program-card program-card--ready">
               <header className="program-card__head">
                 <span className="program-card__icon" aria-hidden="true">
                   <Download size={18} focusable="false" />

@@ -492,6 +492,11 @@ a {
   @apply w-full;
 }
 
+/* «Descargar todas», colocado al final de la galería, a todo el ancho. */
+.photos__all {
+  @apply mt-3 w-full;
+}
+
 @media (max-width: 560px) {
   .photos {
     @apply grid-cols-3;
@@ -808,10 +813,6 @@ a {
   @apply flex flex-wrap gap-3;
 }
 
-.hero__actions-side {
-  @apply shrink-0;
-}
-
 .hero__stats {
   @apply flex flex-wrap items-center gap-3.5 text-[12.5px] text-muted;
 }
@@ -839,8 +840,10 @@ a {
   @apply mb-1 mt-0;
 }
 
+/* El lead ocupa todo lo que deja la cabecera de la sección y sólo salta de
+   línea cuando choca con el borde de esa columna. */
 .landing-section__lead {
-  @apply max-w-[62ch] text-sm leading-[1.6] text-muted;
+  @apply text-sm leading-[1.6] text-muted;
 }
 
 /* --------------------------------------------------------------------------
@@ -894,23 +897,6 @@ a {
   @apply mt-[3px] shrink-0 text-accent;
 }
 
-.program-list--muted li {
-  @apply text-muted;
-}
-
-.program-list--muted li svg {
-  @apply text-muted;
-}
-
-.program-code {
-  @apply mb-4 overflow-x-auto rounded-card border border-line bg-entry p-3.5 text-[12.5px] leading-[1.7] text-ink;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-.program-code code {
-  font-family: inherit;
-}
-
 .program-card__note {
   @apply text-[12.5px] leading-[1.6] text-placeholder;
 }
@@ -918,13 +904,6 @@ a {
 /* --------------------------------------------------------------------------
    Instalación como aplicación (PWA)
    -------------------------------------------------------------------------- */
-/* Ocupa las dos columnas de la rejilla: es una acción distinta de la CLI o
-   la app de escritorio, y necesita sitio para las instrucciones de iOS. */
-.program-card--install {
-  grid-column: 1 / -1;
-  margin-top: var(--spacing);
-}
-
 .install {
   @apply rounded-card border border-line bg-entry p-3.5;
 }
@@ -969,10 +948,10 @@ a {
   @apply mb-3 mt-0 text-[28px] font-bold leading-[1.2] tracking-[-0.02em] text-ink;
 }
 
-/* A 1080px de ancho, los párrafos se estirarían hasta ~1030px: se limita la
-   medida para que la lectura siga siendo cómoda. Los títulos sí ocupan el ancho. */
+/* Lead, párrafos, listas y tabla ocupan el mismo ancho que los títulos:
+   no se limita la medida. */
 .doc__lead {
-  @apply mb-9 max-w-[72ch] text-[15px] leading-[1.65] text-muted;
+  @apply mb-9 text-[15px] leading-[1.65] text-muted;
 }
 
 .doc h2 {
@@ -980,7 +959,7 @@ a {
 }
 
 .doc p {
-  @apply mb-3.5 max-w-[72ch] text-[14.5px] leading-[1.7] text-muted;
+  @apply mb-3.5 text-[14.5px] leading-[1.7] text-muted;
 }
 
 .doc ul {
@@ -988,7 +967,7 @@ a {
 }
 
 .doc li {
-  @apply relative max-w-[72ch] pl-5 text-[14.5px] leading-[1.65] text-muted;
+  @apply relative pl-5 text-[14.5px] leading-[1.65] text-muted;
 }
 
 .doc li::before {

@@ -2,9 +2,10 @@
  * Clasificación y normalización de URLs de TikTok.
  *
  * Port de las funciones auxiliares de `app/client.py` (`is_tiktok_url`,
- * `is_video_url`, `is_profile_url`, `normalize_tiktok_url`,
- * `input_to_profile_url`). Se separan a su propio módulo para evitar
- * dependencias circulares entre el cliente y la fuente de perfiles.
+ * `is_video_url`, `is_profile_url`, `normalize_tiktok_url`) más la lectura de
+ * la entrada del usuario (`input_to_tiktok_url`). Se separan a su propio
+ * módulo para evitar dependencias circulares entre el cliente y la fuente de
+ * perfiles.
  *
  * Sin imports de Node: el navegador (destino de descargas) también lo usa.
  */
@@ -54,13 +55,24 @@ export function isProfileUrl(url: string | null | undefined): boolean {
   return PROFILE_PATH_RE.test(parsed.pathname);
 }
 
-/** Convierte `@usuario` o una URL de perfil en URL normalizada. */
-export function inputToProfileUrl(value: string): string {
+/**
+ * Normaliza lo que escribe el usuario **antes** de clasificarlo.
+ *
+ * Un perfil se escribe como `@usuario` y se resuelve con el host fijo de
+ * TikTok; un vídeo o un post de fotos se pega con su enlace completo. Cualquier
+ * otra entrada se devuelve tal cual (sólo sin espacios exteriores): no se pasa
+ * por `normalizeTikTokUrl` para no recortar barras finales de enlaces cortos,
+ * que cada fuente normaliza por su cuenta.
+ */
+export function inputToTikTokUrl(value: string): string {
   let raw = (value || "").trim();
-  if (raw.startsWith("@") && !raw.includes(" ") && !raw.includes("/")) {
-    raw = `https://www.tiktok.com/${raw}`;
+  if (raw.startsWith("@")) {
+    raw = raw.replace(/\/+$/, "");
+    if (raw.length > 1 && !raw.includes(" ") && !raw.includes("/")) {
+      return `https://www.tiktok.com/${raw}`;
+    }
   }
-  return normalizeTikTokUrl(raw);
+  return raw;
 }
 
 /** Extrae el identificador de un perfil (`@scout2015` → `scout2015`). */
@@ -81,4 +93,20 @@ export function profileFolderName(url: string | null | undefined): string | null
   if (!handle) return null;
   const folder = sanitizeFolderName(handle);
   return folder === "perfil" ? null : folder;
+}
+
+/**
+ * URL de un post concreto a partir de su perfil y su identificador.
+ *
+ * El listado de perfil sólo entrega el enlace del MP4 **estándar**: para pedir
+ * la máxima calidad hay que analizar el post, y eso necesita su URL. Devuelve
+ * `null` si el identificador no es numérico o si la entrada no es un perfil.
+ */
+export function buildVideoUrl(
+  profileUrl: string | null | undefined,
+  videoId: string | null | undefined,
+): string | null {
+  const handle = profileHandle(profileUrl);
+  if (!handle || !videoId || !/^\d{5,30}$/.test(videoId)) return null;
+  return `https://www.tiktok.com/@${handle}/video/${videoId}`;
 }

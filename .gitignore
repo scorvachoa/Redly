@@ -7,17 +7,10 @@ dist/
 *.tsbuildinfo
 next-env.d.ts
 
-# Descargas locales (CLI)
+# Descargas locales
 downloads/
 *.mp4
 *.mp3
-manifest.json
-
-# Salida de pruebas / herramientas
-coverage/
-test-results/
-playwright-report/
-.eslintcache
 
 # Seguridad / entorno
 .env

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  inputToProfileUrl,
+  buildVideoUrl,
+  inputToTikTokUrl,
   isProfileUrl,
   isTikTokUrl,
   isVideoUrl,
@@ -52,9 +53,30 @@ describe("normalización", () => {
     expect(normalizeTikTokUrl(`${PERFIL}   `)).toBe(PERFIL);
   });
 
-  it("convierte @usuario en URL de perfil", () => {
-    expect(inputToProfileUrl("@scout2015")).toBe(PERFIL);
-    expect(inputToProfileUrl(PERFIL)).toBe(PERFIL);
+  it("convierte @usuario en URL de perfil con el host fijo de TikTok", () => {
+    expect(inputToTikTokUrl("@scout2015")).toBe(PERFIL);
+    expect(inputToTikTokUrl("  @scout2015  ")).toBe(PERFIL);
+    expect(inputToTikTokUrl("@scout2015/")).toBe(PERFIL);
+  });
+
+  it("devuelve el resto de entradas sin tocar (sólo quita espacios)", () => {
+    expect(inputToTikTokUrl(PERFIL)).toBe(PERFIL);
+    expect(inputToTikTokUrl(`${PERFIL}/`)).toBe(`${PERFIL}/`);
+    expect(inputToTikTokUrl("https://vm.tiktok.com/ZMxxxxx/")).toBe(
+      "https://vm.tiktok.com/ZMxxxxx/",
+    );
+    expect(inputToTikTokUrl("https://example.com/video/1")).toBe(
+      "https://example.com/video/1",
+    );
+    expect(inputToTikTokUrl("")).toBe("");
+  });
+
+  it("no inventa rutas ni acepta handles incompletos", () => {
+    expect(inputToTikTokUrl("@scout2015/video/6718335390845095173")).toBe(
+      "@scout2015/video/6718335390845095173",
+    );
+    expect(inputToTikTokUrl("@scout 2015")).toBe("@scout 2015");
+    expect(inputToTikTokUrl("@")).toBe("@");
   });
 });
 
@@ -82,5 +104,26 @@ describe("identificador de perfil", () => {
     expect(profileFolderName("https://www.tiktok.com/@a:b")).toBe("a_b");
     // Un handle que no deja nada usable no inventa una carpeta.
     expect(profileFolderName("https://www.tiktok.com/@...")).toBeNull();
+  });
+});
+
+describe("buildVideoUrl", () => {
+  it("construye la URL del post a partir del perfil y su identificador", () => {
+    expect(buildVideoUrl(PERFIL, "6718335390845095173")).toBe(VIDEO);
+    expect(buildVideoUrl(`${PERFIL}/`, "6718335390845095173")).toBe(VIDEO);
+  });
+
+  it("devuelve null si el identificador no es numérico", () => {
+    expect(buildVideoUrl(PERFIL, "anon_ab12")).toBeNull();
+    expect(buildVideoUrl(PERFIL, "")).toBeNull();
+    expect(buildVideoUrl(PERFIL, null)).toBeNull();
+    expect(buildVideoUrl(PERFIL, undefined)).toBeNull();
+    expect(buildVideoUrl(PERFIL, "1234")).toBeNull(); // demasiado corto
+  });
+
+  it("devuelve null si la entrada no es la de un perfil", () => {
+    expect(buildVideoUrl(VIDEO, "6718335390845095173")).toBeNull();
+    expect(buildVideoUrl(null, "6718335390845095173")).toBeNull();
+    expect(buildVideoUrl("https://example.com/@scout2015", "6718335390845095173")).toBeNull();
   });
 });

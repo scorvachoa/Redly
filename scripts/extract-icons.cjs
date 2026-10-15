@@ -2,7 +2,7 @@
  * Extrae los iconos que usa Red.ly desde react-icons/fa6 y genera
  * components/icons.tsx con SVG propios (sin dependencia en tiempo de build).
  */
-const { readFileSync, writeFileSync } = require("fs");
+const { existsSync, readFileSync, writeFileSync } = require("fs");
 const { join } = require("path");
 
 const WANTED = [
@@ -22,19 +22,26 @@ const WANTED = [
   "FaLock",
   "FaRotateRight",
   "FaShieldHalved",
-  "FaTerminal",
   // Descargador: estado, modos y acciones
   "FaCircleCheck",
   "FaCircleInfo",
   "FaTriangleExclamation",
   "FaVideo",
-  "FaUser",
   "FaDownload",
   "FaFolderTree",
 ];
 
-const root = process.argv[2];
-const src = readFileSync(join(root, "node_modules/react-icons/fa6/index.mjs"), "utf8");
+const root = process.argv[2] ?? ".";
+const iconSource = join(root, "node_modules/react-icons/fa6/index.mjs");
+if (!existsSync(iconSource)) {
+  console.error(
+    `No se encuentra ${iconSource}\n` +
+      "react-icons sólo hace falta para regenerar (se quitó del build a propósito):\n" +
+      "  npm i -D react-icons   y, al terminar,   npm rm -D react-icons",
+  );
+  process.exit(1);
+}
+const src = readFileSync(iconSource, "utf8");
 
 /** Atributo JSX: las claves con guion van en camelCase (fill-rule -> fillRule). */
 function jsxAttr(key) {

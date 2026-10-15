@@ -51,6 +51,22 @@ export interface TikTokResult {
   downloads: DownloadOption[];
 }
 
+/**
+ * Opción de máxima calidad de un resultado, si la hay.
+ *
+ * El listado de perfil sólo ofrece el MP4 **estándar** (verificado: 12
+ * tarjetas, 12 enlaces, 0 con `_hd`); el HD sólo aparece al analizar el post.
+ * Devuelve `null` cuando no hay HD: en ese caso hay que conservar la opción
+ * original, porque sustituirla por otra podría cambiarle el formato.
+ */
+export function bestQualityOption(result: TikTokResult): DownloadOption | null {
+  return (
+    result.downloads.find(
+      (option) => (option.quality ?? "").toLowerCase() === "hd",
+    ) ?? null
+  );
+}
+
 /** Resultado de resolver una URL temporal (SnapCDN u otra). */
 export interface RedirectInfo {
   originalUrl: string;
@@ -69,36 +85,6 @@ export interface ProfileVideo {
   thumbnail?: string | null;
   url: string;
   format?: string | null;
-}
-
-/** Nombre corto para listados y logs (nunca incluye la URL). */
-export function profileDisplayName(video: ProfileVideo, max = 60): string {
-  const base = video.title || video.id;
-  return base.length <= max ? base : `${base.slice(0, max - 3)}...`;
-}
-
-/** Estado de un vídeo dentro de un lote. */
-export type BatchItemState = "ok" | "skipped" | "error";
-
-/** Resultado de un vídeo dentro del lote (sin URLs). */
-export interface BatchItemResult {
-  key: string;
-  state: BatchItemState;
-  file?: string | null;
-  bytes?: number | null;
-  title?: string | null;
-  error?: string | null;
-}
-
-/** Resumen de la ejecución de un lote. */
-export interface BatchReport {
-  results: BatchItemResult[];
-  downloaded: number;
-  skipped: number;
-  failed: number;
-}
-
-/** Frase de resumen corta para CLI/API. */
-export function summarize(report: BatchReport): string {
-  return `${report.downloaded} descargado(s) · ${report.skipped} omitido(s) · ${report.failed} fallo(s)`;
+  /** URL del propio post (`buildVideoUrl`): necesaria para pedir la calidad máxima. */
+  postUrl?: string | null;
 }

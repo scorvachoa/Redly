@@ -72,20 +72,8 @@ export default function VideoPanel({
 
       {photos.length > 0 && (
         <>
-          <div className="list-head">
-            <div className="section-title">
-              {photos.length} foto{photos.length === 1 ? "" : "s"}
-            </div>
-            <div className="list-head__actions">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={onDownloadPhotos}
-                disabled={busy}
-              >
-                <Download size={14} aria-hidden="true" /> Descargar todas
-              </button>
-            </div>
+          <div className="section-title">
+            {photos.length} foto{photos.length === 1 ? "" : "s"}
           </div>
 
           <div className="photos">
@@ -106,6 +94,15 @@ export default function VideoPanel({
               </div>
             ))}
           </div>
+
+          <button
+            type="button"
+            className="btn btn--primary photos__all"
+            onClick={onDownloadPhotos}
+            disabled={busy}
+          >
+            <Download size={15} aria-hidden="true" /> Descargar todas
+          </button>
         </>
       )}
 

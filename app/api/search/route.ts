@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { clientKey, apiLimiter } from "@/lib/ratelimit";
 import { detectPlatformSlug, sourceForPlatform } from "@/lib/sources";
 import { searchAny } from "@/lib/savetik";
-import { isTikTokUrl, isProfileUrl } from "@/lib/urls";
+import { inputToTikTokUrl, isTikTokUrl, isProfileUrl } from "@/lib/urls";
 
 import { errorResponse } from "../_responses";
 
@@ -40,9 +40,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Cuerpo JSON inválido." }, { status: 400 });
   }
 
-  const url = typeof (body as { url?: unknown })?.url === "string"
-    ? (body as { url: string }).url.trim()
-    : "";
+  const url =
+    typeof (body as { url?: unknown })?.url === "string"
+      ? inputToTikTokUrl((body as { url: string }).url)
+      : "";
 
   if (!isTikTokUrl(url)) {
     return NextResponse.json(

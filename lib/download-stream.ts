@@ -40,6 +40,44 @@ export function isProfileLike(url: string): boolean {
   }
 }
 
+/** Estados que merecen otra oportunidad (los mismos de `TRANSIENT_HTTP_STATUSES`). */
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+/** Intentos por descarga y espera base entre ellos (crece con el intento). */
+const DOWNLOAD_RETRY_ATTEMPTS = 3;
+const DOWNLOAD_RETRY_WAIT_MS = 1500;
+/** Tope de espera pedida por el servidor en la cabecera `Retry-After`. */
+const MAX_RETRY_AFTER_MS = 60_000;
+
+/** Espera antes del siguiente intento: `Retry-After` si la hay, si no backoff. */
+function retryDelay(response: Response, attempt: number): number {
+  const header = response.headers.get("retry-after");
+  if (header) {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+    }
+  }
+  return DOWNLOAD_RETRY_WAIT_MS * attempt;
+}
+
+/**
+ * `fetch` con reintento para los estados transitorios.
+ *
+ * El límite de la API (30 peticiones/60 s) se comparte entre todos los
+ * endpoints, así que un lote largo acaba recibiendo 429: sin esto cada uno se
+ * convertía en un vídeo fallido. El cuerpo se descarta antes de repetir para
+ * no dejar la conexión abierta.
+ */
+async function fetchWithRetry(target: string): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetch(target);
+    if (response.ok || !RETRYABLE_STATUSES.has(response.status)) return response;
+    await response.body?.cancel().catch(() => undefined);
+    if (attempt >= DOWNLOAD_RETRY_ATTEMPTS) return response;
+    await new Promise((resolve) => setTimeout(resolve, retryDelay(response, attempt)));
+  }
+}
+
 /**
  * Descarga `/api/download?...` siguiendo el stream para mostrar progreso real
  * y escribiendo cada trozo en el `sink` indicado. Devuelve los bytes
@@ -55,7 +93,7 @@ export async function downloadWithProgress(
   makeSink: (filename: string, contentType: string) => FileSink | Promise<FileSink>,
   onProgress: (done: number, total: number | null) => void,
 ): Promise<number> {
-  const response = await fetch(target);
+  const response = await fetchWithRetry(target);
   if (!response.ok) {
     let message = `HTTP ${response.status}`;
     try {

@@ -86,8 +86,8 @@ describe("parseSearchHtml con un carrusel de fotos (photomode)", () => {
 
   it("cada foto es una opción propia, por delante del MP3", () => {
     expect(photos).toHaveLength(2);
-    // Las fotos se añaden primero para que `pickAutoOption` prefiera la imagen
-    // cuando el post no lleva ningún MP4.
+    // Las fotos se añaden primero para que la selección automática prefiera la
+    // imagen cuando el post no lleva ningún MP4.
     expect(photoResult.downloads[0].kind).toBe("image");
     expect(photoResult.downloads[1].kind).toBe("image");
     expect(photoResult.downloads[2].format).toBe("mp3");

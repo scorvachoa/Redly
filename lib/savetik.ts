@@ -22,8 +22,6 @@ import type { AnyNode } from "domhandler";
 import { createHash } from "node:crypto";
 
 import {
-  BATCH_MAX_PAGES,
-  BATCH_PAGE_DELAY_SECONDS,
   PROFILE_FORMAT_PATTERN,
   PROFILE_SELECTORS,
   PROFILE_VIDEO_ID_PATTERN,
@@ -41,9 +39,7 @@ import { RedlyError, RequestError, UnavailableError } from "./exceptions";
 import { fetchWithTimeout, headersInit, sleep } from "./http";
 import type { ProfileVideo, TikTokResult } from "./models";
 import { parseSearchHtml } from "./parser";
-import { isProfileUrl, normalizeTikTokUrl } from "./urls";
-
-export type PageCallback = (page: number, total: number) => void;
+import { buildVideoUrl, isProfileUrl, normalizeTikTokUrl } from "./urls";
 
 /** Resultado de una única petición de listado (una página del perfil). */
 export interface ProfilePage {
@@ -57,9 +53,22 @@ export interface ProfilePage {
 /** Primera página de un perfil: así empieza siempre el cursor. */
 export const FIRST_PAGE_CURSOR = "0";
 
-/** Clave estable para el manifiesto SIN almacenar la URL del token. */
+  /** Clave estable para el historial SIN almacenar la URL del token. */
 export function anonymousKey(url: string): string {
   return createHash("sha1").update(url, "utf8").digest("hex").slice(0, 16);
+}
+
+/**
+ * Completa un ítem del listado con la URL de su propio post.
+ *
+ * El listado sólo trae el enlace del MP4 estándar; para descargar a máxima
+ * calidad hay que analizar el post, y eso necesita esta URL. Si no se puede
+ * construir (identificador no numérico o entrada que no es un perfil), se
+ * devuelve el ítem tal cual.
+ */
+function withPostUrl(profileUrl: string, item: ProfileVideo): ProfileVideo {
+  const postUrl = buildVideoUrl(profileUrl, item.id);
+  return postUrl ? { ...item, postUrl } : item;
 }
 
 export class SavetikSource {
@@ -70,7 +79,6 @@ export class SavetikSource {
 
   private readonly parser: typeof parseSearchHtml;
   private warmed = false;
-  lastHttpStatus: number | null = null;
 
   constructor(parser: typeof parseSearchHtml = parseSearchHtml) {
     this.parser = parser;
@@ -132,7 +140,7 @@ export class SavetikSource {
     for (const item of this.parseCards(html)) {
       if (seen.has(item.id)) continue;
       seen.add(item.id);
-      items.push(item);
+      items.push(withPostUrl(target, item));
       if (max !== null && items.length >= max) break;
     }
 
@@ -145,115 +153,6 @@ export class SavetikSource {
     }
 
     return { items, nextCursor, page: safePage };
-  }
-
-  /**
-   * Lista el perfil devolviendo **sólo los pendientes** según `isDone`.
-   *
-   * Pagina hasta reunir `maxPending` pendientes (o hasta agotar el cursor / el
-   * tope de páginas). `skipped` cuenta los ya descargados que se han dejado de
-   * lado por el camino, de modo que "dame 10" significa 10 de verdad.
-   */
-  async listProfilePending(
-    url: string,
-    isDone: (item: ProfileVideo) => boolean | Promise<boolean>,
-    maxPending?: number,
-    onPage?: (page: number, pending: number, skipped: number) => void,
-  ): Promise<{ items: ProfileVideo[]; skipped: number; pages: number }> {
-    const target = normalizeTikTokUrl(url);
-    if (!isProfileUrl(target)) {
-      throw new RequestError("Esa URL no parece la de un perfil de TikTok.");
-    }
-
-    const limit = maxPending && maxPending > 0 ? maxPending : null;
-    const items: ProfileVideo[] = [];
-    const seenIds = new Set<string>();
-    const seenCursors = new Set<string>();
-    let cursor: string | null = FIRST_PAGE_CURSOR;
-    let page = 1;
-    let skipped = 0;
-
-    while (page <= BATCH_MAX_PAGES && cursor !== null) {
-      const result = await this.listProfilePage(target, cursor, page);
-
-      let added = 0;
-      for (const item of result.items) {
-        if (seenIds.has(item.id)) continue;
-        seenIds.add(item.id);
-        if (await isDone(item)) {
-          skipped += 1;
-          continue;
-        }
-        items.push(item);
-        added += 1;
-        if (limit !== null && items.length >= limit) break;
-      }
-
-      onPage?.(page, items.length, skipped);
-
-      if (limit !== null && items.length >= limit) break;
-      if (result.items.length === 0 && added === 0) break;
-
-      const next = result.nextCursor;
-      if (next === null) break;
-      if (next === cursor || seenCursors.has(next)) break;
-      seenCursors.add(next);
-
-      if (BATCH_PAGE_DELAY_SECONDS > 0) await sleep(BATCH_PAGE_DELAY_SECONDS);
-      cursor = next;
-      page += 1;
-    }
-
-    return { items, skipped, pages: page };
-  }
-
-  /** Lista los vídeos de un perfil paginando con `next_cursor`. */
-  async listProfile(
-    url: string,
-    maxVideos?: number,
-    onPage?: PageCallback,
-  ): Promise<ProfileVideo[]> {
-    const target = normalizeTikTokUrl(url);
-    if (!isProfileUrl(target)) {
-      throw new RequestError("Esa URL no parece la de un perfil de TikTok.");
-    }
-
-    const limit = maxVideos && maxVideos > 0 ? maxVideos : null;
-    const items: ProfileVideo[] = [];
-    const seenIds = new Set<string>();
-    const seenCursors = new Set<string>();
-    let cursor: string | null = FIRST_PAGE_CURSOR;
-    let page = 1;
-
-    while (page <= BATCH_MAX_PAGES && cursor !== null) {
-      const remaining = limit === null ? undefined : Math.max(1, limit - items.length);
-      const result = await this.listProfilePage(target, cursor, page, remaining);
-
-      let added = 0;
-      for (const item of result.items) {
-        if (seenIds.has(item.id)) continue;
-        seenIds.add(item.id);
-        items.push(item);
-        added += 1;
-        if (limit !== null && items.length >= limit) break;
-      }
-
-      onPage?.(page, items.length);
-
-      if (limit !== null && items.length >= limit) break;
-      if (added === 0 && items.length === 0) break;
-
-      const next = result.nextCursor;
-      if (next === null) break;
-      if (next === cursor || seenCursors.has(next)) break;
-      seenCursors.add(next);
-
-      if (BATCH_PAGE_DELAY_SECONDS > 0) await sleep(BATCH_PAGE_DELAY_SECONDS);
-      cursor = next;
-      page += 1;
-    }
-
-    return items;
   }
 
   // -------------------------------------------------------------------------
@@ -274,7 +173,6 @@ export class SavetikSource {
           SAVETIK_AJAX_SEARCH_URL,
           { method: "POST", headers: headersInit(SAVETIK_HEADERS), body: payload },
         );
-        this.lastHttpStatus = response.status;
 
         if (TRANSIENT_HTTP_STATUSES.has(response.status)) {
           lastError = new RequestError(`SavTikPro respondió HTTP ${response.status}.`);

@@ -4,7 +4,7 @@ import { API_PROFILE_MAX } from "@/lib/config";
 import { PROFILE_PAGE_TTL_MS, profilePageCache, profilePageKey } from "@/lib/cache";
 import { clientKey, apiLimiter } from "@/lib/ratelimit";
 import { detectPlatformSlug, sourceForPlatform } from "@/lib/sources";
-import { isProfileUrl } from "@/lib/urls";
+import { inputToTikTokUrl, isProfileUrl } from "@/lib/urls";
 
 import { errorResponse } from "../_responses";
 
@@ -52,7 +52,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     cursor?: unknown;
     page?: unknown;
   };
-  const url = typeof payload.url === "string" ? payload.url.trim() : "";
+  const url = typeof payload.url === "string" ? inputToTikTokUrl(payload.url) : "";
 
   if (!isProfileUrl(url)) {
     return NextResponse.json(

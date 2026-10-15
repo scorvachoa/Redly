@@ -15,12 +15,6 @@ export class RedlyError extends Error {
 /** Error de red o de respuesta HTTP/JSON inesperada. */
 export class RequestError extends RedlyError {}
 
-/** El HTML recibido no pudo ser interpretado. */
-export class ParseError extends RedlyError {}
-
-/** La URL introducida no parece una URL de TikTok válida. */
-export class InvalidUrlError extends RedlyError {}
-
 /** Error durante la resolución o descarga de un archivo. */
 export class DownloadError extends RedlyError {}
 

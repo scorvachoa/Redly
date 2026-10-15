@@ -11,7 +11,7 @@ import {
 
 describe("registro de fuentes", () => {
   it("sólo está registrada la fuente verificada", () => {
-    // base.md §2: sólo se registra lo que se ha comprobado empíricamente.
+    // Sólo se registra lo que se ha comprobado empíricamente.
     expect(allSources().map((source) => source.id)).toEqual(["savetikpro"]);
   });
 

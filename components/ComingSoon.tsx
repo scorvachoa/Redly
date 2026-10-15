@@ -9,9 +9,9 @@ import type { Platform, PlatformKind } from "@/lib/platforms";
  * Estado «Próximamente» de una plataforma.
  *
  * No se muestra ningún formulario de descarga ni transcripción porque **no hay
- * un origen comprobado** para esa plataforma: `base.md` §2 prohíbe inventar
- * endpoints, y sólo TikTok está verificado empíricamente. Decir «próximamente»
- * es preferible a mostrar un botón que no puede funcionar.
+ * un origen comprobado** para esa plataforma: no se inventan endpoints, y sólo
+ * TikTok está verificado empíricamente. Decir «próximamente» es preferible a
+ * mostrar un botón que no puede funcionar.
  */
 export default function ComingSoon({
   platform,

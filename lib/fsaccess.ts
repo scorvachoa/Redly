@@ -64,8 +64,7 @@ export async function pickDirectory(): Promise<FileSystemDirectoryHandle | null>
 
 /**
  * Escribe en una carpeta elegida por el usuario. Crea `subdir` dentro de ella
- * si se indica (así un perfil siempre queda en su propia subcarpeta, igual que
- * en la CLI).
+ * si se indica (así un perfil siempre queda en su propia subcarpeta).
  */
 export async function directorySink(
   root: FileSystemDirectoryHandle,
@@ -119,7 +118,7 @@ export function anchorSink(suggestedName: string, contentType: string): FileSink
   };
 }
 
-/** Une el destino con una subcarpeta opcional (misma convención que la CLI). */
+/** Une el destino con una subcarpeta opcional. */
 export function joinDestination(root: string, subdir: string | null): string {
   const base = (root || "").replace(/[\\/]+$/, "");
   const folder = (subdir || "").replace(/^[\\/]+|[\\/]+$/g, "");

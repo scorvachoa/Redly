@@ -12,12 +12,10 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     globals: false,
-    // Sin esperas reales en los tests: los reintentos y las pausas del lote
-    // se quedan a 0 para que la suite sea instantánea.
+    // Sin esperas reales en los tests: el retroceso entre intentos se deja en
+    // 0 s para que la suite sea instantánea (el número de intentos no cambia).
     env: {
       RETRY_BACKOFF_SECONDS: "0",
-      BATCH_DELAY_SECONDS: "0",
-      BATCH_PAGE_DELAY_SECONDS: "0",
     },
   },
 });

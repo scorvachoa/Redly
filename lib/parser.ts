@@ -145,8 +145,8 @@ function extractDownloads($: cheerio.CheerioAPI): DownloadOption[] {
     });
   };
 
-  // Las fotos van primero: `pickAutoOption` (CLI) elige la primera opción cuando
-  // no encuentra MP4, y en un carrusel eso debe ser una imagen, no el MP3.
+  // Las fotos van primero: cuando un post no tiene MP4, la selección automática
+  // toma la primera opción y en un carrusel eso debe ser una imagen, no el MP3.
   for (const anchor of collectPhotoAnchors($)) {
     add(anchor, "jpeg", photoThumbnail($, anchor));
   }

@@ -2,24 +2,23 @@
 
 Cliente TypeScript/Next.js del flujo HTTP de **TikVid** y **SavTikPro** para
 URLs de TikTok: analiza un vídeo y muestra las opciones de descarga, o lista un
-**perfil completo** y lo descarga en lote con manifiesto de reanudación.
+**perfil completo** y descarga en lote, reanudando con el historial.
 
-Se sirve como aplicación web (interfaz en el navegador + API propia que hace de
-proxy) y también como **CLI** con los mismos comandos que el PoC Python.
+Es una aplicación web: interfaz en el navegador + API propia que hace de proxy.
 
 **Web desplegada:** <https://red-ly.vercel.app/>
 
 > **No es una API oficial de TikVid ni de SavTikPro.** Los endpoints y el HTML
 > no están documentados y pueden cambiar en cualquier momento. El proyecto
 > trabaja únicamente con URLs públicas y peticiones HTTP normales, sin
-> autenticación, sin cookies personales y sin medidas de evasión (ver
-> `base.md` §25: no se saltan CAPTCHAs ni controles de acceso).
+> autenticación, sin cookies personales y sin medidas de evasión: no se saltan
+> CAPTCHAs ni controles de acceso.
 
 ---
 
 ## Requisitos
 
-* Node.js 18+ (probado en Node 24.11.1 / npm 11.14.1)
+* Node.js 20+ (probado en Node 24.11.1 / npm 11.14.1)
 * Conexión a Internet sólo para el uso real (los tests no la necesitan)
 
 ## Instalación
@@ -41,7 +40,6 @@ npm run build      # build de producción (Next 15)
 npm run typecheck  # tsc --noEmit
 npm test           # vitest (sin red)
 npm run smoke      # handlers de la API contra la red real
-npm run cli -- --help
 ```
 
 ---
@@ -68,8 +66,8 @@ Plataformas: `tiktok`, `youtube`, `facebook`, `instagram`, `twitter`, `threads`
 propio, que lista las plataformas disponibles.
 
 > **Sólo TikTok está implementado.** Las demás existen en la estructura de
-> navegación, pero no se les asigna ningún endpoint: `base.md` §2 prohíbe
-> inventar APIs, y no hay ninguna fuente comprobada para ellas. La página
+> navegación, pero no se les asigna ningún endpoint: no se inventan APIs, y no
+> hay ninguna fuente comprobada para ellas. La página
 > «Próximamente» lo explica en lugar de mostrar un botón que no podría
 > funcionar. Con la transcripción pasa lo mismo en **todas** las plataformas.
 
@@ -90,7 +88,9 @@ Los iconos de `components/icons.tsx` son **SVG incrustados** (paths de Font Awes
 licencia CC BY 4.0) en lugar de `react-icons`: su barril de exports activa el
 `optimizePackageImports` de Next, que a veces referencia un chunk de proveedor
 (`vendor-chunks/react-icons`) que no llega a emitirse y la página caía con
-`Cannot find module`. Para regenerarlos: `node scripts/extract-icons.cjs`.
+`Cannot find module`. Para regenerarlos hace falta `react-icons` sólo durante el
+proceso: `npm i -D react-icons && node scripts/extract-icons.cjs` (y después
+`npm rm -D react-icons`, porque no debe volver a entrar en el build).
 
 ### Iconos (favicon)
 
@@ -185,7 +185,7 @@ La marca y el botón de tema no van pegados al borde de la ventana: el contenido
 de la cabecera vive en `.header__inner`, que replica el ancho y el padding de
 `.main`, de modo que la marca cae siempre sobre el mismo eje vertical que el
 texto. El pie (`components/SiteFooter.tsx`) sigue la misma regla, y es común a
-la portada, el descargador, «Próximamente», el 404 y `/privacidad`.
+la portada, el descargador, «Próximamente», el 404, `/creditos` y `/privacidad`.
 
 ### Ancho
 
@@ -194,10 +194,10 @@ Todas las páginas comparten **1080px** de ancho: `.main`, `.header__inner`,
 mismo `padding-inline`, así que la portada, el descargador, «Próximamente», el
 404 y `/privacidad` se alinean sin excepción.
 
-Al ensanchar, el texto corrido se estiraría hasta ~1030px, así que los
-párrafos y las listas de `/privacidad` (`.doc p`, `.doc li`, `.doc__lead`) se
-limitan a `72ch`. Las tarjetas y los formularios sí ocupan el ancho completo.
-Los títulos no se limitan.
+No hay medida límite para el texto: párrafos, listas y lead de los documentos
+(`.doc p`, `.doc li`, `.doc__lead`) ocupan el ancho completo, igual que los
+títulos, las tarjetas y los formularios. Así `/creditos` y `/privacidad` no
+dejan la mitad derecha vacía.
 
 El botón de GitHub apunta a `REPO_URL` (`lib/site.ts`), con el repositorio
 público del proyecto. Con valor, el enlace aparece solo en la portada y en el
@@ -205,15 +205,18 @@ pie; vacía, no se muestra ninguno.
 
 ### Descargador de TikTok
 
-* Pega una URL de TikTok. Si es de **vídeo**, se analiza sola y muestra título,
-  miniatura e opciones; si es de **perfil** (`@usuario` o `/@usuario`), pagina
-  el listado hasta reunir los vídeos **pendientes** y activa el botón
-  **Descargar N vídeos**.
+* Pega **`@usuario`** para un perfil, o la URL completa de un **vídeo** o de un
+  **post de fotos**. Vídeo y carrusel se analizan solos y muestran título,
+  miniatura y opciones; un perfil pagina el listado hasta reunir los vídeos
+  **pendientes** y activa el botón **Descargar N vídeos**.
 * Cada descarga usa `/api/download` en streaming con barra de progreso; el
   archivo se guarda en el navegador con nombre saneado, en la carpeta que
   elijas (Chromium) o en Descargas.
 * El lote se ejecuta **secuencialmente** en el cliente (una petición a la vez,
   pausa de 700 ms entre vídeos) para no saturar el origen.
+* Cada descarga **reintenta hasta 3 veces** ante `429`/`5xx` antes de rendirse
+  (honrando `Retry-After` si la trae): el límite de la API son 30 peticiones
+  por minuto y un lote largo lo tocaría inevitablemente.
 * El **historial** (`localStorage`) marca los ya bajados con el badge
   «Ya descargado» y los excluye del lote; hay botón para borrarlo.
 * Tema claro/oscuro (botón con icono SVG), compartido entre todas las rutas.
@@ -292,6 +295,10 @@ curl -X POST localhost:3000/api/profile \
 curl -L -o video.mp4 "localhost:3000/api/download?url=<enlace>&name=v.mp4"
 ```
 
+`/api/profile` acepta además el perfil abreviado (`"@usuario"`): la entrada se
+normaliza con el host fijo de TikTok antes de clasificarla. Un vídeo o un post
+de fotos se envía siempre con su enlace completo.
+
 Validaciones (devuelven `400` con `{ ok:false, error }`):
 
 * URL que no es de TikTok.
@@ -359,12 +366,12 @@ interface ContentSource {
 ```
 
 Hoy sólo está registrada la fuente verificada de TikTok. Añadir otra plataforma
-significa implementar el contrato y añadirla al registro, sin tocar las rutas ni
-el CLI. Las plataformas sin fuente reciben `501`, no un intento de adivinar.
+significa implementar el contrato y añadirla al registro, sin tocar las rutas.
+Las plataformas sin fuente reciben `501`, no un intento de adivinar.
 
-El motivo es que `savetikpro.com` es un tercero sin API documentada
-(`base.md` §2/§36): si un día deja de funcionar o hay que cambiar de proveedor,
-el cambio se confina en un módulo.
+El motivo es que `savetikpro.com` es un tercero sin API documentada: si un día
+deja de funcionar o hay que cambiar de proveedor, el cambio se confina en un
+módulo.
 
 ### CORS y despliegue en Vercel
 
@@ -378,101 +385,18 @@ navegador.
 
 ---
 
-## CLI
-
-Mismos comandos que el PoC Python:
-
-```bash
-npm run cli -- --url "https://www.tiktok.com/@usuario/video/123" --option 2
-npm run cli -- --profile "@usuario" --max 10
-npm run cli -- --profile "@usuario" --list-only
-npm run cli -- --batch lista.txt --delay 2 --yes
-npm run cli -- --no-download --debug
-```
-
-| Opción | Descripción |
-| --- | --- |
-| `--url` | URL de TikTok: vídeo (interactivo) o perfil (lote). Si no se indica, se pide por teclado |
-| `--profile` | URL de perfil o `@usuario`: lista y descarga en lote |
-| `--batch` | Fichero con una URL de TikTok (vídeo o perfil) por línea (`#` comentarios) |
-| `--max` | Máximo de vídeos del lote (0 = sin límite) |
-| `--delay` | Pausa en segundos entre vídeos (por defecto `1.0`) |
-| `--list-only` | Sólo lista los vídeos, no descarga nada |
-| `-y` / `--yes` | No pide confirmación antes del lote |
-| `--no-resume` | Vuelve a descargar lo ya marcado como completado |
-| `--option` | Índice de la opción de descarga (1-based), en modo vídeo |
-| `--output-dir` | Carpeta **raíz** de destino (por defecto `downloads/`); cada perfil crea su subcarpeta |
-| `--no-download` | Resuelve la URL temporal pero no descarga, en modo vídeo |
-| `--debug` | Muestra endpoint, statuses, nº de opciones y dominio final |
-
-En `--debug` **nunca** se muestran tokens, cookies ni URLs firmadas completas:
-los parámetros sensibles se enmascaran.
-
-### Descarga en masa (perfil)
-
-```bash
-npm run cli -- --profile "@usuario" --max 20 --yes
-```
-
-```text
-Listando perfil... https://www.tiktok.com/@usuario
-  · destino: downloads/usuario
-  · página 1: 11 vídeos
-
-Vídeos del perfil (11)
-  1  7694475743509646622  Why did Stella...  2K  usuario/
-...
-
-1/11 Why did Stella do THAT? #pool #fail
-      ✓ Redly_7694475743509646622.mp4 (9,858,537 bytes)
-
-✓ Lote terminado · 11 descargado(s) · 0 omitido(s) · 0 fallo(s)
-Manifiesto: downloads/manifest.json
-```
-
-Cómo funciona:
-
-* **Fuente del listado**: `POST https://savetikpro.com/api/ajaxSearch` con la
-  URL del perfil, `cursor` y `page`. Devuelve HTML con tarjetas (título, canal,
-  vistas, miniatura y un enlace de descarga directo) y un `next_cursor` para la
-  página siguiente. Misma familia de producto que TikVid. Sin API documentada.
-* **Orden estrictamente secuencial**: un vídeo a la vez, con pausa
-  (`--delay`) entre peticiones. Nunca descarga en paralelo.
-* **Reanudación**: `downloads/manifest.json` guarda, por ID de vídeo, estado
-  (`ok`/`error`), nombre de archivo y bytes — **nunca URLs ni tokens**, que
-  caducan en ~1 hora. Se consulta **antes de listar**, así que los completados
-  ni siquiera entran en la cola y los fallidos se reintentan con tokens frescos.
-  Escritura atómica (`.tmp` + rename). El manifiesto vive en la **raíz** y es
-  **compartido entre perfiles** (los IDs de vídeo son únicos globalmente). Ver
-  «Historial de descargas».
-* **Ficheros de lote**: cada línea puede ser un perfil (se expande) o un vídeo
-  suelto (se analiza y se elige el mejor MP4). Los vídeos sueltos van a la raíz,
-  porque la URL de un vídeo no lleva el autor.
-* En modo vídeo suelto, la búsqueda intenta primero SavTikPro y cae a TikVid
-  automáticamente (`searchAny`).
-* **Sólo vídeo y audio.** El listado de SavTikPro no incluye las publicaciones
-  de fotos, y cada tarjeta trae un único enlace directo: el lote escribe **un
-  archivo por ítem** (`resolveUrl` + `downloadToFile`) y no expande carruseles.
-  Para fotos hay que analizar la URL del post suelto (galería + «Descargar
-  todas»). Ver «Parsing» → «Publicaciones de fotos».
-
----
-
 ## Destino de las descargas
 
 Cada perfil se guarda en **su propia subcarpeta**, con el nombre del perfil
-saneado (`@scout2015` → `scout2015/`). `--output-dir` sigue siendo la raíz:
+saneado (`@scout2015` → `scout2015/`):
 
 ```text
-downloads/
-  manifest.json          ← compartido entre perfiles
+Carpeta elegida/            ← o «Descargas» del navegador
   scout2015/
     Redly_7694475743509646622.mp4
   otroperfil/
     Redly_9999000000000000001.mp4
 ```
-
-### En la web
 
 El navegador no permite elegir destino salvo con la **File System Access API**,
 así que hay dos caminos:
@@ -499,14 +423,12 @@ La lógica vive en `lib/fsaccess.ts` (apt navegador, sin imports de `node:*`).
 Evita repetir vídeos ya bajados. Guarda **sólo** estado, nombre de archivo,
 bytes y título — **nunca URLs ni tokens**, que caducan en ~1 hora.
 
-| Superficie | Dónde se guarda | Clave |
-| --- | --- | --- |
-| **Web** | `localStorage` del navegador | `redly-history-v1` |
-| **CLI** | `<output-dir>/manifest.json` | id del vídeo |
+| Dónde se guarda | Clave |
+| --- | --- |
+| `localStorage` del navegador | `redly-history-v1` |
 
-Los dos historiales son **independientes**: Vercel no tiene sistema de archivos
-persistente entre invocaciones, así que no se pueden sincronizar sin base de
-datos.
+El historial vive **sólo en tu navegador**: Vercel no tiene sistema de archivos
+persistente entre invocaciones, así que nada se sincroniza con el servidor.
 
 ### En la web
 
@@ -519,18 +441,6 @@ datos.
 * Botón **"Borrar historial"** con el total de vídeos registrados.
 * En modo privado (sin `localStorage`) la app sigue funcionando pero avisa de
   que cada análisis empezará de cero.
-
-### En la CLI
-
-* `collectTargets` consulta el manifiesto **antes** de listar: la tabla, la
-  confirmación `¿Continuar? [s/N]` y `--max` cuentan sólo pendientes.
-* `--max 20` significa 20 **nuevos**; si ya tenías 5, se omiten y se buscan 15
-  más paginando con `listProfilePending`.
-* `--no-resume` ignora el historial y vuelve a bajarlo todo.
-* Si todo estaba descargado, el comando lo dice y termina con código 0.
-
-`Manifest.isDone()` comprueba además que el archivo exista y no esté vacío; en
-la web no hay forma de verificarlo, así que se confía en el historial.
 
 ---
 
@@ -569,6 +479,7 @@ Redly/
 │   ├── InstallApp.tsx          # botón de instalación + instrucciones iOS
 │   ├── Downloader.tsx          # orquestador de la UI de TikTok (estado del flujo)
 │   ├── downloader/             # piezas del descargador, extraídas de Downloader
+│   │   ├── DestinationRow.tsx  # fila de destino (carpeta elegida + estado)
 │   │   ├── VideoPanel.tsx      # resultado de un vídeo suelto (presentacional)
 │   │   ├── ProfilePanel.tsx    # resultado de un perfil (presentacional)
 │   │   ├── ProgressBar.tsx     # barra de progreso, con variante indeterminada
@@ -581,10 +492,10 @@ Redly/
 ├── lib/                        # núcleo portable, sin dependencias de Next
 │   ├── config.ts               # endpoints, headers, timeouts, allowlist, .env
 │   ├── exceptions.ts           # jerarquía TikVidError
-│   ├── models.ts               # TikTokResult, ProfileVideo, optionLabel, summarize
+│   ├── models.ts               # TikTokResult, ProfileVideo, optionLabel, bestQualityOption
 │   ├── platforms.ts            # registro de plataformas (fuente única de rutas)
 │   ├── sources.ts              # contrato ContentSource + registro de fuentes
-│   ├── site.ts                 # constantes de UI (REPO_URL, anclas de sección)
+│   ├── site.ts                 # constantes de UI (REPO_URL, enlace de la app)
 │   ├── ratelimit.ts            # límite de tasa por cliente (ventana deslizante)
 │   ├── cache.ts                # TtlCache con LRU + caché de páginas de perfil
 │   ├── download-stream.ts      # descarga con progreso en el navegador (sin React)
@@ -596,10 +507,8 @@ Redly/
 │   ├── savetik.ts              # SavTikPro: página única, perfiles, 1 vídeo, searchAny
 │   ├── history.ts              # historial de descargas (storage inyectable)
 │   ├── fsaccess.ts             # sinks de escritura + selector de carpeta (web)
-│   ├── downloader.ts           # resolveUrl (redirects), sanitizeFilename, streaming
-│   └── batch.ts                # runBatch secuencial + subdirFor + Manifest atómico
+│   └── downloader.ts           # resolveUrl (redirects), sanitizeFilename, streaming
 │
-├── src/cli.ts                  # CLI (commander + picocolors)
 ├── scripts/api-smoke.ts        # handlers reales contra la red
 ├── scripts/extract-icons.cjs   # regenera components/icons.tsx
 ├── scripts/make-favicon.cjs    # regenera favicon.ico, apple-icon.png e iconos PWA (usa sharp)
@@ -611,13 +520,12 @@ Redly/
 ```
 
 Responsabilidades separadas: `lib/http.ts` no parsea HTML, `lib/parser.ts` no
-hace peticiones, `lib/savetik.ts` sólo lista y resuelve, `lib/batch.ts` sólo
-orquesta el orden, las subcarpetas y el manifiesto, `lib/downloader.ts` no
+hace peticiones, `lib/savetik.ts` sólo lista y resuelve, `lib/downloader.ts` no
 conoce el flujo de búsqueda y `lib/history.ts` sólo guarda estado (sin tocar
-red ni disco). Los Route Handlers y el CLI son delgados: sólo orquestan `lib/`.
+red ni disco). Los Route Handlers son delgados: sólo orquestan `lib/`.
 
-`lib/` no importa nada de `next/`, de modo que la CLI y los tests lo usan tal
-cual. Además, `lib/sanitize.ts`, `lib/urls.ts`, `lib/models.ts`, `lib/history.ts`
+`lib/` no importa nada de `next/`, de modo que los tests lo usan tal cual.
+Además, `lib/sanitize.ts`, `lib/urls.ts`, `lib/models.ts`, `lib/history.ts`
 y `lib/fsaccess.ts` **tampoco importan `node:*`**, así que el navegador los
 usa directamente (es lo que permite el destino de descargas y el historial web).
 
@@ -680,9 +588,9 @@ Se excluyen enlaces de navegación y se deduplican las URLs repetidas.
 
 Las publicaciones de fotos de TikTok (`photomode`) traen un botón por imagen
 en lugar de calidades de vídeo. Se añaden **por delante** de las demás
-opciones, de modo que cuando el post no lleva ningún MP4, `pickAutoOption`
-elige la imagen en lugar de caer al MP3. Cada opción de foto conserva su
-miniatura propia.
+opciones, de modo que cuando el post no lleva ningún MP4 la selección
+automática toma la imagen en lugar de caer al MP3. Cada opción de foto
+conserva su miniatura propia.
 
 La extensión se lee del campo `filename` del JWT de `pro.snapcdn.app`
 (`SaveTikPro.com_<id>_<n>.jpeg`); si el token no es un JWT legible, se cae a
@@ -695,7 +603,7 @@ y el historial usa una clave por foto (`<id>#<n>`).
 > **Sólo por URL de post.** El listado de perfil de SavTikPro **no incluye**
 > las publicaciones de fotos (verificado el 2026-10-14: 232 tarjetas reales de
 > 4 perfiles, 0 con miniatura `photomode` y 0 con extensión distinta de
-> `mp4`), así que el lote de perfil nunca las verá. Ver «Limitaciones».
+> `mp4`), así que el listado de perfil nunca las traerá. Ver «Limitaciones».
 
 ---
 
@@ -713,16 +621,12 @@ Estas URLs están **firmadas y son temporales**. El proyecto:
 * no las versiona en Git,
 * sólo las usa durante la ejecución.
 
-El manifiesto del lote guarda únicamente `state`, `updated`, `file`, `bytes` y
-`title`.
-
 ---
 
 ## Descarga
 
-`downloadToFile()` escribe por chunks en streaming; si la respuesta falla o
-queda un archivo parcial, éste se elimina. En la web, `/api/download` hace lo
-mismo pero devuelve el stream al navegador.
+`/api/download` sigue las redirecciones de la URL temporal y devuelve el cuerpo
+al navegador como stream, sin materializarlo en el servidor.
 
 Los nombres se sanean localmente (`Redly_<id>.<ext>`): se eliminan caracteres
 inválidos, `..`, `/`, `\` y se respetan los nombres reservados de Windows.
@@ -735,19 +639,19 @@ inválidos, `..`, `/`, `\` y se respetan los nombres reservados de Windows.
 npm test
 ```
 
-145 tests, **sin Internet**:
+131 tests, **sin Internet**:
 
 * `tests/platforms.test.ts`: registro de plataformas (sólo TikTok disponible, ninguna con transcripción, slugs únicos), `getPlatform` e `isReady`.
 * `tests/sources.test.ts`: contrato `ContentSource`, detección de plataforma por host (subdominios, host que sólo termina igual) y que las plataformas sin fuente devuelven `null`.
 * `tests/urls.test.ts`: validación y normalización de URLs (vídeo, perfil, subdominios, `@usuario`, barra final) y `profileHandle`/`profileFolderName` (destino por perfil).
 * `tests/sanitize.test.ts`: `sanitizeFilename` (traversal, reservados de Windows, truncado con extensión) y `sanitizeFolderName` (carpetas).
 * `tests/parser.test.ts`: título, thumbnail, video ID, MP4/HD/MP3, elementos ausentes, HTML incompleto, deduplicación.
-* `tests/savetik.test.ts`: clasificación de URLs, tarjetas de perfil, página única (`listProfilePage`), paginación (`cursor`/`page`), `listProfilePending` (salta los ya descargados), deduplicación, `404` con `cursor=""`, detalle de vídeo, `searchAny` (mock de `fetch` global) y **selectores con fallback** (clases internas renombradas, enlace sin `.pro-dl-link`, tarjeta sin enlace).
+* `tests/models.test.ts`: `bestQualityOption` (elige el HD, cae al estándar y no confunde el audio) para la descarga en masa de máxima calidad.
+* `tests/savetik.test.ts`: clasificación de URLs, tarjetas de perfil, página única (`listProfilePage`) con cursor/`page`, `404` y reintentos, detalle de vídeo, `searchAny` (mock de `fetch` global) y **selectores con fallback** (clases internas renombradas, enlace sin `.pro-dl-link`, tarjeta sin enlace).
 * `tests/ratelimit.test.ts`: ventana deslizante, aislamiento por clave, liberación al avanzar el tiempo, purga de claves muertas y extracción de IP del cliente.
 * `tests/cache.test.ts`: TTL, techo LRU, contadores de aciertos y la clave de caché de páginas de perfil.
 * `tests/download-stream.test.ts`: `formatBytes`, `isProfileLike` y `progressLabel`.
 * `tests/history.test.ts`: `mark`/`isDone`/`clear`, persistencia entre instancias, que **no** guarda URLs ni tokens, storage nulo y storage que lanza al escribir.
-* `tests/batch.test.ts`: descarga secuencial, manifiesto sin URLs/tokens, escritura atómica, reanudación, reintentos de fallos, orden, callbacks, `itemOutputPath`, `joinOutputDir` y `subdirFor` (manifiesto compartido en la raíz) (mock de `lib/downloader`).
 
 Los fixtures `tests/fixtures/*.html` son copias anonimizadas del HTML real
 (tokens sustituidos por valores ficticios), compartidos con el PoC Python.
@@ -773,10 +677,7 @@ SAVETIK_BASE_URL / SAVETIK_AJAX_SEARCH_URL / SAVETIK_HOME_PATH / SAVETIK_LANG
 TIKVID_BASE_URL / TIKVID_AJAX_SEARCH_URL
 REQUEST_TIMEOUT / DOWNLOAD_TIMEOUT / MAX_REDIRECTS
 RETRY_ATTEMPTS / RETRY_BACKOFF_SECONDS
-BATCH_DELAY_SECONDS / BATCH_PAGE_DELAY_SECONDS / BATCH_MAX_PAGES
-DOWNLOAD_DIRECTORY / MANIFEST_PATH
 API_PROFILE_MAX              # tope de vídeos POR INVOCACIÓN (no por perfil)
-ALLOWED_DOWNLOAD_HOSTS    # lista blanca del proxy /api/download
 RATE_LIMIT_MAX / RATE_LIMIT_WINDOW_SECONDS   # límite de tasa de /api/*
 PROFILE_CACHE_TTL_MS      # TTL de la caché de páginas de perfil
 ```
@@ -784,6 +685,9 @@ PROFILE_CACHE_TTL_MS      # TTL de la caché de páginas de perfil
 `RATE_LIMIT_*` y `PROFILE_CACHE_TTL_MS` se leen directamente en
 `lib/ratelimit.ts` y `lib/cache.ts` (no pasan por `lib/config.ts`) para que
 cada módulo sea autosuficiente; el efecto es el mismo.
+
+`ALLOWED_DOWNLOAD_HOSTS` **no** es variable de entorno: es una constante con la
+lista fija de CDNs, dentro de `lib/config.ts`.
 
 Copia `.env.example` a `.env.local` para sobreescribir valores.
 
@@ -799,9 +703,8 @@ Proyecto desplegado y funcionando en **<https://red-ly.vercel.app/>**.
 
 Notas:
 
-* **No hay FS persistente entre invocaciones de función**: el manifiesto de la
-  CLI vive en disco (`downloads/manifest.json`, sólo existe donde la ejecutas) y
-  el de la web en `localStorage`. Son independientes entre sí.
+* **No hay FS persistente entre invocaciones de función**: el historial vive en
+  `localStorage` del navegador, nunca en el servidor.
 * El lote de la web corre en el cliente y pagina el perfil invocación a
   invocación (`/api/profile` + `cursor`), por lo que cada llamada es corta.
 * Si el origen bloquea el despliegue, revisa `ALLOWED_DOWNLOAD_HOSTS` y los
@@ -820,8 +723,7 @@ k_url_convert = "https://s1.tik-cdn.com/api/json/convert";
 ```
 
 **No se usa ese endpoint.** Antes de convertirlo en un módulo hay que verificar
-en DevTools si realmente se llama, con qué método, payload y respuesta
-(`base.md` §36).
+en DevTools si realmente se llama, con qué método, payload y respuesta.
 
 ---
 
@@ -831,23 +733,20 @@ en DevTools si realmente se llama, con qué método, payload y respuesta
   HTML, las clases CSS y SnapCDN pueden cambiar sin aviso.
 * El acceso puede estar protegido por Cloudflare; una respuesta HTML en lugar
   de JSON se reporta como error claro.
-* Las URLs temporales expiran (`403/404/410`). En el lote, un token caducado
-  marca el vídeo como fallo y la siguiente ejecución lo reintenta con uno fresco.
+* Las URLs temporales expiran (`403/404/410`). Si el token caducó, hay que
+  volver a analizar para recibir uno fresco.
 * El listado de perfil depende de SavTikPro: si cambia el `next_cursor` o las
   clases de las tarjetas, habrá que ajustar `lib/savetik.ts`.
 * Las **publicaciones de fotos** (carrusel) sólo se pueden descargar analizando
-  su URL individual: el listado de perfil de SavTikPro **no las incluye** y el
-  lote de perfil escribe un solo archivo por tarjeta (ver «Parsing» →
-  «Publicaciones de fotos»).
+  su URL individual: el listado de perfil de SavTikPro **no las incluye** y cada
+  tarjeta trae un único enlace directo (ver «Parsing» → «Publicaciones de fotos»).
 * El scraping directo de `tiktok.com/@usuario` **no está implementado** (WAF).
 * Sólo se soporta **TikTok**. Las rutas `/download/{youtube,facebook,…}` y
   `/transcript/*` existen en la navegación pero muestran «Próximamente»: no hay
-  ninguna fuente comprobada para ellas y no se inventan endpoints (`base.md` §2).
+  ninguna fuente comprobada para ellas y no se inventan endpoints.
 * No hay base de datos, usuarios ni cuentas.
-* Los historiales de la **web** (`localStorage`) y de la **CLI** (disco) son
-  independientes: no se sincronizan entre sí.
-* En la web no se puede comprobar que el archivo exista realmente (la CLI hace
-  `stat`); se confía en el historial, con el botón de borrarlo como escape.
+* No se puede comprobar que el archivo exista realmente: se confía en el
+  historial, con el botón de borrarlo como escape.
 * En la web, elegir la carpeta de destino sólo funciona en **Chromium**
   (Chrome/Edge/Opera). En Firefox y Safari los archivos van a Descargas, y la
   subcarpeta del perfil se crea sólo en Chrome/Edge.
@@ -863,14 +762,13 @@ en DevTools si realmente se llama, con qué método, payload y respuesta
 ```text
 1. HTTP + parser + descarga (núcleo lib/)   ✓
 2. Interfaz web (Next.js + API)             ✓
-3. CLI con paridad con la Python             ✓
-4. Lote por perfil + reanudación            ✓ (CLI)
-5. Paginación por cursor + historial web    ✓
-6. Destino por perfil + carpeta elegida     ✓ (CLI + web)
-7. Portada + rutas /download/* y /transcript/*  ✓ (estructura; sólo TikTok activo)
-8. Otras plataformas (YouTube, FB, IG…)     ·
-9. Transcripción                            · (sin fuente comprobada)
-10. Proveedor reutilizable en Laravel       ·
+3. Lote por perfil + reanudación            ✓
+4. Paginación por cursor + historial        ✓
+5. Destino por perfil + carpeta elegida     ✓
+6. Portada + rutas /download/* y /transcript/*  ✓ (estructura; sólo TikTok activo)
+7. Otras plataformas (YouTube, FB, IG…)     ·
+8. Transcripción                            · (sin fuente comprobada)
+9. Proveedor reutilizable en Laravel        ·
 ```
 
 ---

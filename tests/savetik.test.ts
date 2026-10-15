@@ -80,105 +80,6 @@ describe("anonymousKey", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tarjetas de perfil
-// ---------------------------------------------------------------------------
-describe("listProfile", () => {
-  it("extrae los campos de cada tarjeta", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    const items = await source.listProfile(PERFIL, 1);
-
-    expect(items).toHaveLength(1);
-    const first = items[0];
-    expect(first.id).toBe("7694475743509646622");
-    expect(first.title).toBe("Why did Stella do THAT? #pool #fail");
-    expect(first.channel).toBe("Scout, Suki & Stella");
-    expect(first.views).toBe("1.8K");
-    expect(first.url).toContain("https://pro.snapcdn.app/dl?token=FAKE_TOKEN_A");
-    expect(first.format).toBe("mp4");
-    expect(first.thumbnail).toBe("https://cdn.example/thumb1.jpeg");
-  });
-
-  it("pagina con cursor y page incrementales", async () => {
-    const page2 = PROFILE_HTML.replace("7123456789012345678", "9999999999999999999");
-    queue.push(jsonResponse(profileBody(PROFILE_HTML, "1759000000")));
-    queue.push(jsonResponse(profileBody(page2)));
-    const source = new SavetikSource();
-
-    const items = await source.listProfile(PERFIL);
-
-    expect(items.map((item) => item.id)).toEqual([
-      "7694475743509646622",
-      "7001234567890123456",
-      "7123456789012345678",
-      "9999999999999999999",
-    ]);
-    expect(posts()).toHaveLength(2);
-    expect(params(posts()[0]).get("cursor")).toBe("0");
-    expect(params(posts()[0]).get("page")).toBe("1");
-    expect(params(posts()[1]).get("cursor")).toBe("1759000000");
-    expect(params(posts()[1]).get("page")).toBe("2");
-  });
-
-  it("respeta maxVideos y no pide más páginas", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    const items = await source.listProfile(PERFIL, 2);
-
-    expect(items).toHaveLength(2);
-    expect(posts()).toHaveLength(1);
-  });
-
-  it("quita la barra final del payload (evita 404)", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    await source.listProfile(`${PERFIL}/`, 1);
-
-    expect(params(posts()[0]).get("q")).toBe(PERFIL);
-  });
-
-  it("nunca envía cursor vacío", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    await source.listProfile(PERFIL, 1);
-
-    const cursor = params(posts()[0]).get("cursor");
-    expect(cursor).not.toBe("");
-    expect(cursor).not.toBeNull();
-  });
-
-  it("deduplica los vídeos repetidos entre páginas", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML, "111")));
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    const items = await source.listProfile(PERFIL);
-
-    expect(items).toHaveLength(3);
-  });
-
-  it("rechaza una URL que no es de perfil", async () => {
-    const source = new SavetikSource();
-    await expect(source.listProfile(VIDEO)).rejects.toBeInstanceOf(RequestError);
-    expect(posts()).toHaveLength(0);
-  });
-
-  it("invoca onPage tras cada página", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-    const seen: Array<[number, number]> = [];
-
-    await source.listProfile(PERFIL, 1, (page, total) => seen.push([page, total]));
-
-    expect(seen).toEqual([[1, 1]]);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // listProfilePage (una petición = una página)
 // ---------------------------------------------------------------------------
 describe("listProfilePage", () => {
@@ -192,6 +93,20 @@ describe("listProfilePage", () => {
     expect(page.nextCursor).toBe("1759000000");
     expect(page.page).toBe(1);
     expect(posts()).toHaveLength(1);
+  });
+
+  it("añade la URL del post a cada ítem (hace falta para pedir el HD)", async () => {
+    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
+    const source = new SavetikSource();
+
+    const page = await source.listProfilePage(PERFIL);
+
+    // El listado sólo trae el MP4 estándar: la URL del post es la única vía
+    // para analizarlo y obtener la máxima calidad.
+    expect(page.items[0].postUrl).toBe(
+      "https://www.tiktok.com/@scout2015/video/7694475743509646622",
+    );
+    expect(page.items.every((item) => Boolean(item.postUrl))).toBe(true);
   });
 
   it("devuelve nextCursor null en la última página", async () => {
@@ -254,83 +169,23 @@ describe("listProfilePage", () => {
     const source = new SavetikSource();
     await expect(source.listProfilePage(VIDEO)).rejects.toBeInstanceOf(RequestError);
   });
-});
 
-// ---------------------------------------------------------------------------
-// listProfilePending (salta lo ya descargado)
-// ---------------------------------------------------------------------------
-describe("listProfilePending", () => {
-  it("devuelve sólo los pendientes y cuenta los omitidos", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
+  it("HTTP 404 se traduce en contenido no disponible", async () => {
+    queue.push(jsonResponse({}, 404));
     const source = new SavetikSource();
-    const done = new Set(["7694475743509646622"]);
 
-    const result = await source.listProfilePending(PERFIL, (item) => done.has(item.id));
-
-    expect(result.items.map((item) => item.id)).toEqual([
-      "7001234567890123456",
-      "7123456789012345678",
-    ]);
-    expect(result.skipped).toBe(1);
+    await expect(source.listProfilePage(PERFIL)).rejects.toBeInstanceOf(UnavailableError);
   });
 
-  it("pagina hasta reunir el número de pendientes pedido", async () => {
-    // Página 1 entera ya descargada; la 2 aporta uno nuevo.
-    const page2 = PROFILE_HTML.replace("7123456789012345678", "9999999999999999999");
-    queue.push(jsonResponse(profileBody(PROFILE_HTML, "111")));
-    queue.push(jsonResponse(profileBody(page2)));
+  it("reintenta ante errores transitorios", async () => {
+    queue.push(jsonResponse({}, 503));
+    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
     const source = new SavetikSource();
-    const done = new Set([
-      "7694475743509646622",
-      "7001234567890123456",
-      "7123456789012345678",
-    ]);
 
-    const result = await source.listProfilePending(PERFIL, (item) => done.has(item.id), 1);
+    const page = await source.listProfilePage(PERFIL);
 
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0].id).toBe("9999999999999999999");
-    expect(result.skipped).toBe(3);
+    expect(page.items).toHaveLength(3);
     expect(posts()).toHaveLength(2);
-  });
-
-  it("se detiene cuando se agota el cursor", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    const result = await source.listProfilePending(PERFIL, () => true, 5);
-
-    expect(result.items).toHaveLength(0);
-    expect(result.skipped).toBe(3);
-    expect(posts()).toHaveLength(1);
-  });
-
-  it("invoca onPage con pendientes y omitidos", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-    const seen: Array<[number, number, number]> = [];
-
-    await source.listProfilePending(
-      PERFIL,
-      (item) => item.id === "7694475743509646622",
-      undefined,
-      (page, pending, skipped) => seen.push([page, pending, skipped]),
-    );
-
-    expect(seen).toEqual([[1, 2, 1]]);
-  });
-
-  it("acepta un isDone asíncrono", async () => {
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    const result = await source.listProfilePending(
-      PERFIL,
-      async (item) => item.id === "7694475743509646622",
-    );
-
-    expect(result.items).toHaveLength(2);
-    expect(result.skipped).toBe(1);
   });
 });
 
@@ -360,24 +215,6 @@ describe("searchVideo", () => {
     const source = new SavetikSource();
 
     await expect(source.searchVideo(VIDEO)).rejects.toThrow("Video not found.");
-  });
-
-  it("HTTP 404 se traduce en contenido no disponible", async () => {
-    queue.push(jsonResponse({}, 404));
-    const source = new SavetikSource();
-
-    await expect(source.listProfile(PERFIL)).rejects.toBeInstanceOf(UnavailableError);
-  });
-
-  it("reintenta ante errores transitorios", async () => {
-    queue.push(jsonResponse({}, 503));
-    queue.push(jsonResponse(profileBody(PROFILE_HTML)));
-    const source = new SavetikSource();
-
-    const items = await source.listProfile(PERFIL, 1);
-
-    expect(items).toHaveLength(1);
-    expect(posts()).toHaveLength(2);
   });
 
   it("lanza error si la respuesta no es JSON", async () => {

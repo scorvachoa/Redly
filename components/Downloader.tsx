@@ -37,9 +37,9 @@ import {
 } from "@/components/icons";
 import { downloadWithProgress, isProfileLike, progressLabel } from "@/lib/download-stream";
 import { joinDestination } from "@/lib/fsaccess";
-import type { DownloadOption, ProfileVideo, TikTokResult } from "@/lib/models";
+import { bestQualityOption, type DownloadOption, type ProfileVideo, type TikTokResult } from "@/lib/models";
 import type { Platform } from "@/lib/platforms";
-import { profileFolderName } from "@/lib/urls";
+import { inputToTikTokUrl, profileFolderName } from "@/lib/urls";
 
 type Mode = "idle" | "video" | "profile";
 
@@ -91,6 +91,30 @@ function firstMediaIndex(result: TikTokResult): number {
   return index === -1 ? 0 : index;
 }
 
+/**
+ * Pide al servidor las opciones del post y devuelve la de máxima calidad.
+ *
+ * El listado de perfil sólo entrega el MP4 estándar; el HD sólo aparece al
+ * analizar el post. Si la petición falla, está limitada por tasa o no hay HD,
+ * se devuelve `null` y se conserva la URL del listado: mejorar la calidad nunca
+ * debe impedir que el vídeo se descargue.
+ */
+async function fetchBestQualityUrl(postUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: postUrl }),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { ok?: boolean; result?: TikTokResult };
+    if (!data.ok || !data.result) return null;
+    return bestQualityOption(data.result)?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Downloader({ platform }: { platform: Platform }) {
   const [url, setUrl] = useState("");
   const [mode, setMode] = useState<Mode>("idle");
@@ -98,7 +122,6 @@ export default function Downloader({ platform }: { platform: Platform }) {
   const [busy, setBusy] = useState(false);
 
   const [result, setResult] = useState<TikTokResult | null>(null);
-  const [thumb, setThumb] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
 
   const [items, setItems] = useState<ProfileVideo[]>([]);
@@ -121,7 +144,6 @@ export default function Downloader({ platform }: { platform: Platform }) {
 
   const reset = useCallback(() => {
     setResult(null);
-    setThumb(null);
     setItems([]);
     setSelected(0);
     setDoneIds(new Set());
@@ -234,7 +256,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
   );
 
   const analyze = useCallback(async () => {
-    const target = url.trim();
+    const target = inputToTikTokUrl(url);
     if (!target) {
       setStatus({ kind: "error", text: "Introduce una URL de TikTok." });
       inputRef.current?.focus();
@@ -259,7 +281,6 @@ export default function Downloader({ platform }: { platform: Platform }) {
         setCheckedIds(new Set(pending.map((item) => item.id)));
         setProfileStats({ pending: pending.length, done: done.length, pages });
         setMode("profile");
-        setThumb(collected[0]?.thumbnail ?? null);
         setStatus({
           kind: "ok",
           text: `Perfil listo · ${pending.length} pendiente(s) · ${done.length} ya descargado(s)`,
@@ -281,7 +302,6 @@ export default function Downloader({ platform }: { platform: Platform }) {
 
         setResult(data.result);
         setMode("video");
-        setThumb(data.result.thumbnail ?? null);
         setSelected(firstMediaIndex(data.result));
         setStatus({ kind: "ok", text: `Listo · ${data.result.downloads.length} opción(es) encontradas` });
       }
@@ -354,7 +374,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
   /**
    * Descarga las fotos de un carrusel una a una.
    *
-   * Cada foto lleva su propia clave de historial (`<id>#<n>`): el manifiesto
+   * Cada foto lleva su propia clave de historial (`<id>#<n>`): el historial
    * guarda por id, y con una sola clave todas se pisarían entre sí.
    */
   const downloadPhotos = useCallback(async () => {
@@ -365,6 +385,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
     setBusy(true);
     let completed = 0;
     let failed = 0;
+    let lastError: string | null = null;
 
     for (let index = 0; index < photos.length; index++) {
       const option = photos[index];
@@ -400,8 +421,9 @@ export default function Downloader({ platform }: { platform: Platform }) {
             title: result.title ?? undefined,
           });
         }
-      } catch {
+      } catch (error) {
         failed += 1;
+        lastError = (error as Error)?.message ?? "Error desconocido";
       }
 
       // Misma pausa que en el lote de perfil: no golpear al CDN.
@@ -413,7 +435,9 @@ export default function Downloader({ platform }: { platform: Platform }) {
     setBusy(false);
     setStatus({
       kind: failed === 0 ? "ok" : "error",
-      text: `Fotos terminadas · ${completed} descargada(s) · ${failed} fallo(s)`,
+      text: `Fotos terminadas · ${completed} descargada(s) · ${failed} fallo(s)${
+        failed > 0 ? ` · ${lastError ?? ""}` : ""
+      }`,
     });
     setProgress({
       done: 0,
@@ -433,6 +457,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
     setBusy(true);
     let completed = 0;
     let failed = 0;
+    let lastError: string | null = null;
 
     for (let index = 0; index < queue.length; index++) {
       const item = queue[index];
@@ -446,7 +471,12 @@ export default function Downloader({ platform }: { platform: Platform }) {
 
       const name = `Redly_${item.id}.${item.format ?? "mp4"}`;
       try {
-        const params = new URLSearchParams({ url: item.url, name });
+        // El listado sólo trae el MP4 estándar: se busca el HD y, si no lo hay
+        // o falla la consulta, se baja el que ya se tenía.
+        const sourceUrl = item.postUrl
+          ? (await fetchBestQualityUrl(item.postUrl)) ?? item.url
+          : item.url;
+        const params = new URLSearchParams({ url: sourceUrl, name });
         const bytes = await downloadWithProgress(
           `/api/download?${params.toString()}`,
           name,
@@ -474,11 +504,12 @@ export default function Downloader({ platform }: { platform: Platform }) {
           pending: Math.max(0, stats.pending - 1),
           done: stats.done + 1,
         }));
-      } catch {
+      } catch (error) {
         failed += 1;
+        lastError = (error as Error)?.message ?? "Error desconocido";
         history.mark(item.id, "error", {
           title: item.title ?? undefined,
-          error: "Descarga fallida en el navegador",
+          error: lastError,
         });
       }
 
@@ -491,7 +522,9 @@ export default function Downloader({ platform }: { platform: Platform }) {
     setBusy(false);
     setStatus({
       kind: failed === 0 ? "ok" : "error",
-      text: `Lote terminado · ${completed} descargado(s) · ${failed} fallo(s)`,
+      text: `Lote terminado · ${completed} descargado(s) · ${failed} fallo(s)${
+        failed > 0 ? ` · ${lastError ?? ""}` : ""
+      }`,
     });
     setProgress({
       done: 0,
@@ -550,7 +583,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
               className="input"
               type="url"
               spellCheck={false}
-              placeholder={`https://www.${platform.hosts[0]}/@usuario  ·  o la URL de un vídeo`}
+              placeholder={`@usuario  ·  o la URL de un vídeo o foto`}
               value={url}
               disabled={busy}
               onChange={(event) => setUrl(event.target.value)}

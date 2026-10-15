@@ -18,19 +18,7 @@ import { fetchWithTimeout, headersInit, sleep } from "./http";
 import type { TikTokResult } from "./models";
 import { parseSearchHtml } from "./parser";
 
-export interface TikVidClientOptions {
-  debug?: boolean;
-}
-
 export class TikVidClient {
-  readonly debug: boolean;
-  lastHttpStatus: number | null = null;
-  lastLogicalStatus: string | null = null;
-
-  constructor(options: TikVidClientOptions = {}) {
-    this.debug = options.debug ?? false;
-  }
-
   /** Envía la URL de TikTok a TikVid y devuelve los datos parseados. */
   async search(url: string): Promise<TikTokResult> {
     const payload = new URLSearchParams({ q: url, lang: "en" });
@@ -46,7 +34,6 @@ export class TikVidClient {
             body: payload,
           },
         );
-        this.lastHttpStatus = response.status;
 
         if (TRANSIENT_HTTP_STATUSES.has(response.status)) {
           lastError = new RequestError(`TikVid respondió HTTP ${response.status}.`);
@@ -90,7 +77,6 @@ export class TikVidClient {
     }
     const record = body as Record<string, unknown>;
     const status = String(record.status ?? "").toLowerCase();
-    this.lastLogicalStatus = status || "ok";
 
     if (status !== "ok" && status !== "") {
       const message = String(record.message ?? record.msg ?? "").trim();

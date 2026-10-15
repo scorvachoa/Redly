@@ -9,7 +9,7 @@ import { PLATFORMS, getPlatform } from "@/lib/platforms";
  * `/download/<plataforma>`
  *
  * Sólo TikTok tiene implementación real. El resto muestra «Próximamente» en
- * lugar de un formulario que no podría funcionar (`base.md` §2).
+ * lugar de un formulario que no podría funcionar.
  */
 
 interface PageProps {

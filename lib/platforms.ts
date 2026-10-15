@@ -6,8 +6,8 @@
  *
  * **Importante**: hoy sólo TikTok está verificado y es funcional. Las demás
  * plataformas existen en la estructura de navegación con estado
- * «Próximamente», pero **no** se les asigna ningún endpoint: `base.md` §2
- * prohíbe inventar APIs, y ni SavTikPro ni TikVid tienen nada comprobado
+ * «Próximamente», pero **no** se les asigna ningún endpoint: no se inventan
+ * APIs sin comprobar, y ni SavTikPro ni TikVid tienen nada comprobado
  * para YouTube, Facebook, Instagram, X ni Threads.
  *
  * Módulo sin imports: lo usan la portada (servidor) y las páginas de cliente.
@@ -22,7 +22,7 @@ export interface Platform {
   name: string;
   /** Iniciales de la tarjeta (sin emojis). */
   monogram: string;
-  /** Color de marca, para el acento de la tarjeta. */
+  /** Color de la ficha de la tarjeta (icono y borde). */
   accent: string;
   /** ¿Existe implementación real de descarga? Sólo TikTok. */
   ready: boolean;
@@ -39,7 +39,7 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "tiktok",
     name: "TikTok",
     monogram: "TT",
-    accent: "#fe2c55",
+    accent: "#7c5cff",
     ready: true,
     transcriptReady: false,
     blurb: "Un vídeo suelto o un perfil completo, con reanudación.",

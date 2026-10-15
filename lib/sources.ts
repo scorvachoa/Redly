@@ -2,12 +2,12 @@
  * Fachada de fuentes de contenido.
  *
  * Motivo de existir: hasta ahora las rutas hacían `new SavetikSource()` a pelo,
- * de modo que el orquestador (API, CLI) estaba atado a un único proveedor de
- * terceros sin API documentada. Este módulo introduce un contrato mínimo
- * (`ContentSource`) y un registro, de modo que añadir otra plataforma significa
- * implementar el contrato y registrarla, sin tocar las rutas ni el CLI.
+ * de modo que la orquestación estaba atada a un único proveedor de terceros sin
+ * API documentada. Este módulo introduce un contrato mínimo (`ContentSource`) y
+ * un registro, de modo que añadir otra plataforma significa implementar el
+ * contrato y registrarla, sin tocar las rutas.
  *
- * **Regla de `base.md` §2**: sólo se registra una fuente que esté verificada
+ * **Regla del registro**: sólo se registra una fuente que esté verificada
  * empíricamente. Las plataformas sin fuente comprobada no entran aquí; siguen
  * existiendo en `lib/platforms.ts` con `ready: false` para la navegación.
  */
@@ -15,8 +15,6 @@
 import type { TikTokResult } from "./models";
 import { PLATFORMS, type Platform } from "./platforms";
 import { SavetikSource, type ProfilePage } from "./savetik";
-
-export type { ProfilePage };
 
 /**
  * Contrato mínimo que debe cumplir cualquier fuente.

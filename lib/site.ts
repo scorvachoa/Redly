@@ -14,6 +14,3 @@ export const REPO_URL = "https://github.com/scorvachoa/Redly";
  */
 export const DESKTOP_DOWNLOAD_URL =
   "https://github.com/scorvachoa/Redly-Desktop/releases/latest/download/Redly.exe";
-
-/** Sección de la portada a la que apunta «Obtener programa». */
-export const PROGRAM_SECTION_ID = "obtener-programa";

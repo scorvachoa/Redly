@@ -16,8 +16,8 @@ export default function SiteFooter() {
             Red<span>.ly</span>
           </div>
           <p className="site-footer__tag">
-            Descarga y transcripción de vídeos públicos. Funciona en el navegador y
-            en la terminal, sin registro ni cuentas.
+            Descarga y transcripción de vídeos públicos. Sin registro ni cuentas,
+            con historial local de lo ya descargado.
           </p>
         </div>
 

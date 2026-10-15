@@ -56,21 +56,6 @@ export const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
 // ---------------------------------------------------------------------------
 // Descargas
 // ---------------------------------------------------------------------------
-export const CHUNK_SIZE = 1024 * 1024;
-// `MAX_FILENAME_LENGTH` vive en `./sanitize` (módulo sin dependencias de Node,
-// usable también desde el navegador); se reexporta aquí por compatibilidad.
-export { MAX_FILENAME_LENGTH } from "./sanitize";
-
-// ---------------------------------------------------------------------------
-// Lote / descarga en masa
-// ---------------------------------------------------------------------------
-export const BATCH_DELAY_SECONDS = envNum("BATCH_DELAY_SECONDS", 1);
-export const BATCH_PAGE_DELAY_SECONDS = envNum("BATCH_PAGE_DELAY_SECONDS", 1);
-export const BATCH_MAX_PAGES = envNum("BATCH_MAX_PAGES", 100);
-export const BATCH_DEFAULT_MAX_VIDEOS = envNum("BATCH_DEFAULT_MAX_VIDEOS", 0); // 0 = sin límite
-export const DOWNLOAD_DIRECTORY = envStr("DOWNLOAD_DIRECTORY", "downloads");
-export const MANIFEST_PATH = envStr("MANIFEST_PATH", "downloads/manifest.json");
-
 /** Tope de vídeos que la API web devolverá por perfil (protege la función). */
 export const API_PROFILE_MAX = envNum("API_PROFILE_MAX", 100);
 
@@ -212,18 +197,8 @@ export const ALLOWED_DOWNLOAD_HOSTS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Utilidades de saneado / máscara
+// Utilidades para logs
 // ---------------------------------------------------------------------------
-const TOKEN_KEY_PATTERN = /(token|signature|sign|auth|key)=[^&\s]+/gi;
-
-/** Oculta tokens y firmas de una URL para poder mostrarla en logs. */
-export function maskUrl(url: string, visible = 28): string {
-  if (!url) return "";
-  const masked = url.replace(TOKEN_KEY_PATTERN, (_m, key: string) => `${key}=<oculto>`);
-  if (masked.length > visible) return `${masked.slice(0, visible)}...<long=${url.length}>`;
-  return masked;
-}
-
 /** Devuelve sólo el host de una URL (seguro para logs). */
 export function urlHost(url: string): string | null {
   try {
