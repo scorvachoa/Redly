@@ -14,7 +14,9 @@
 
 import type { TikTokResult } from "./models";
 import { PLATFORMS, type Platform } from "./platforms";
-import { SavetikSource, type ProfilePage } from "./savetik";
+import { RequestError } from "./exceptions";
+import { SavetikSource, searchAny, type ProfilePage } from "./savetik";
+import { SnapYTSource } from "./snapyt";
 
 /**
  * Contrato mínimo que debe cumplir cualquier fuente.
@@ -29,6 +31,12 @@ export interface ContentSource {
   readonly id: string;
   /** Slugs de `lib/platforms.ts` que esta fuente sabe servir. */
   readonly platforms: readonly string[];
+  /**
+   * ¿Sabe servir listados de perfil/canal? `undefined` cuenta como `true`
+   * (compatibilidad con las fuentes anteriores a la marca explícita).
+   * La ruta responde `501` sin llamar a `listProfilePage` cuando es `false`.
+   */
+  readonly supportsProfiles?: boolean;
   /** Resuelve un vídeo suelto en el modelo canónico. */
   searchVideo(url: string): Promise<TikTokResult>;
   /** Devuelve una sola página de un perfil y el cursor para la siguiente. */
@@ -45,13 +53,45 @@ export interface ContentSource {
 // ---------------------------------------------------------------------------
 
 /**
+ * Fachada de TikTok: un sólo vídeo con fallback (SavTikPro → TikVid) y el
+ * listado de perfiles delegado en `SavetikSource`.
+ *
+ * Envuelve la pareja de módulos existente para que las rutas puedan decir
+ * `source.searchVideo(url)` sin conocer `searchAny` ni a ningún proveedor.
+ */
+export class TikTokSource implements ContentSource {
+  readonly id = "tiktok";
+  readonly platforms = ["tiktok"] as const;
+  readonly supportsProfiles = true;
+
+  /** Instancia compartida: reutiliza el *warm-up* entre invocaciones. */
+  private readonly savetik = new SavetikSource();
+
+  searchVideo(url: string): Promise<TikTokResult> {
+    return searchAny(url, { savetik: this.savetik });
+  }
+
+  listProfilePage(
+    url: string,
+    cursor?: string | null,
+    page?: number,
+    limit?: number,
+  ): Promise<ProfilePage> {
+    return this.savetik.listProfilePage(url, cursor, page, limit);
+  }
+}
+
+/**
  * Instancias de las fuentes verificadas, en orden de preferencia.
  *
  * Se crean una sola vez por módulo: compartir el cliente entre invocaciones
- * aprovecha el *warm-up* de la sesión HTTP dentro de la misma instancia de la
- * función serverless. No es un caché de datos, sólo de conexión.
+ * reutiliza la conexión HTTP dentro de la misma instancia de la función
+ * serverless. No es un caché de datos, sólo de conexión.
+ *
+ * YouTube se sirve con una única fuente (SnapYT), sin cadena de respaldo:
+ * YTDown e Invidious se retiraron tras comprobar que no servían desde backend.
  */
-const SOURCES: readonly ContentSource[] = [new SavetikSource()];
+const SOURCES: readonly ContentSource[] = [new TikTokSource(), new SnapYTSource()];
 
 /** Devuelve todas las fuentes registradas (orden de preferencia). */
 export function allSources(): readonly ContentSource[] {

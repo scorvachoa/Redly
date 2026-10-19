@@ -43,6 +43,31 @@ export const SAVETIK_AJAX_SEARCH_URL = envStr(
 export const SAVETIK_HOME_PATH = envStr("SAVETIK_HOME_PATH", "/en");
 export const SAVETIK_LANG = envStr("SAVETIK_LANG", "en");
 
+/**
+ * Fuente de YouTube (SnapYT). Flujo de tres pasos vía `admin-ajax.php`
+ * (nonce → `process_video_url` → preview HTML), verificado sin WAF.
+ */
+export const SNAPYT_BASE_URL = stripSlash(
+  envStr("SNAPYT_BASE_URL", "https://www.snapyt.app"),
+);
+export const SNAPYT_AJAX_URL = envStr(
+  "SNAPYT_AJAX_URL",
+  `${SNAPYT_BASE_URL}/wp-admin/admin-ajax.php`,
+);
+
+/**
+ * Listados de YouTube (YTMP3.gg). La API de metadatos `yt-meta.convert1s.com`
+ * sirve el contenido de una lista de reproducción (hasta 100 vídeos por página,
+ * con token opaco de continuación), sin clave, WAF ni Turnstile. Verificado
+ * empíricamente. Sólo listado: la descarga de cada vídeo va por SnapYT.
+ */
+export const YT_YTMP3_META_BASE_URL = stripSlash(
+  envStr("YT_YTMP3_META_BASE_URL", "https://yt-meta.convert1s.com"),
+);
+export const YT_YTMP3_PLAYLIST_PATH = envStr("YT_YTMP3_PLAYLIST_PATH", "/playlist");
+/** Vídeos por página que el servicio devuelve de un tirón (máximo observable). */
+export const YT_YTMP3_MAX_PER_PAGE = envNum("YT_YTMP3_MAX_PER_PAGE", 100);
+
 // ---------------------------------------------------------------------------
 // Timeouts y reintentos
 // ---------------------------------------------------------------------------
@@ -90,6 +115,23 @@ export const SAVETIK_HEADERS: Record<string, string> = {
   "X-Requested-With": "XMLHttpRequest",
   Origin: SAVETIK_BASE_URL,
   Referer: `${SAVETIK_BASE_URL}${SAVETIK_HOME_PATH}`,
+};
+
+export const SNAPYT_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "*/*",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+  "X-Requested-With": "XMLHttpRequest",
+  Origin: SNAPYT_BASE_URL,
+  Referer: `${SNAPYT_BASE_URL}/`,
+};
+
+/** Cabeceras para la API de metadatos de YTMP3 (`yt-meta.convert1s.com`). */
+export const YT_YTMP3_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json, text/plain, */*",
+  Referer: "https://media.ytmp3.gg/",
 };
 
 export const DOWNLOAD_HEADERS: Record<string, string> = {
@@ -194,6 +236,11 @@ export const ALLOWED_DOWNLOAD_HOSTS = [
   "tik-cdn.com",
   "s1.tik-cdn.com",
   "s2.tik-cdn.com",
+  // YouTube: los enlaces de descarga de SnapYT pasan por su proxy propio
+  // (`admin-ajax.php?action=snapyt_force_download`), resuelto en `snapyt.app`.
+  "snapyt.app",
+  // Por si alguna opción apunta al CDN de vídeo directo de googlevideo.com.
+  "googlevideo.com",
 ];
 
 // ---------------------------------------------------------------------------

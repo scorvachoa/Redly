@@ -4,11 +4,11 @@
  * Es la **fuente única** para la portada y las rutas `/download/[platform]`
  * y `/transcript/[platform]`.
  *
- * **Importante**: hoy sólo TikTok está verificado y es funcional. Las demás
- * plataformas existen en la estructura de navegación con estado
- * «Próximamente», pero **no** se les asigna ningún endpoint: no se inventan
- * APIs sin comprobar, y ni SavTikPro ni TikVid tienen nada comprobado
- * para YouTube, Facebook, Instagram, X ni Threads.
+ * **Importante**: hoy sólo TikTok y YouTube están verificados y son
+ * funcionales. Las demás plataformas existen en la estructura de navegación
+ * con estado «Próximamente», pero **no** se les asigna ningún endpoint: no se
+ * inventan APIs sin comprobar, y ni SavTikPro ni TikVid tienen nada comprobado
+ * para Facebook, Instagram, X ni Threads.
  *
  * Módulo sin imports: lo usan la portada (servidor) y las páginas de cliente.
  */
@@ -24,8 +24,10 @@ export interface Platform {
   monogram: string;
   /** Color de la ficha de la tarjeta (icono y borde). */
   accent: string;
-  /** ¿Existe implementación real de descarga? Sólo TikTok. */
+  /** ¿Existe implementación real de descarga? TikTok y YouTube. */
   ready: boolean;
+  /** ¿Existe descarga por lotes de un perfil/canal completo? Sólo TikTok. */
+  profilesReady: boolean;
   /** ¿Existe implementación real de transcripción? Ninguna hoy. */
   transcriptReady: boolean;
   /** Texto corto para la tarjeta. */
@@ -41,6 +43,7 @@ export const PLATFORMS: readonly Platform[] = [
     monogram: "TT",
     accent: "#7c5cff",
     ready: true,
+    profilesReady: true,
     transcriptReady: false,
     blurb: "Un vídeo suelto o un perfil completo, con reanudación.",
     hosts: ["tiktok.com", "vm.tiktok.com", "vt.tiktok.com"],
@@ -50,9 +53,10 @@ export const PLATFORMS: readonly Platform[] = [
     name: "YouTube",
     monogram: "YT",
     accent: "#ff0000",
-    ready: false,
+    ready: true,
+    profilesReady: true,
     transcriptReady: false,
-    blurb: "Vídeos, Shorts y directos de YouTube.",
+    blurb: "Vídeos, Shorts, enlaces cortos y listas de reproducción.",
     hosts: ["youtube.com", "youtu.be", "m.youtube.com"],
   },
   {
@@ -61,6 +65,7 @@ export const PLATFORMS: readonly Platform[] = [
     monogram: "FB",
     accent: "#1877f2",
     ready: false,
+    profilesReady: false,
     transcriptReady: false,
     blurb: "Publicaciones y Reels de Facebook.",
     hosts: ["facebook.com", "fb.watch", "m.facebook.com"],
@@ -71,6 +76,7 @@ export const PLATFORMS: readonly Platform[] = [
     monogram: "IG",
     accent: "#e1306c",
     ready: false,
+    profilesReady: false,
     transcriptReady: false,
     blurb: "Reels, vídeos e historias públicas.",
     hosts: ["instagram.com", "instagr.am"],
@@ -81,6 +87,7 @@ export const PLATFORMS: readonly Platform[] = [
     monogram: "X",
     accent: "#0f1419",
     ready: false,
+    profilesReady: false,
     transcriptReady: false,
     blurb: "Vídeos incrustados en publicaciones de X.",
     hosts: ["twitter.com", "x.com", "t.co"],
@@ -91,6 +98,7 @@ export const PLATFORMS: readonly Platform[] = [
     monogram: "TH",
     accent: "#101010",
     ready: false,
+    profilesReady: false,
     transcriptReady: false,
     blurb: "Publicaciones con vídeo de Threads.",
     hosts: ["threads.net", "www.threads.net"],

@@ -95,7 +95,7 @@ export default function CreditsPage() {
         <h2>Servicios de terceros</h2>
         <p>
           Red.ly no analiza el vídeo en casa: el HTML de los vídeos y de los
-          perfiles lo devuelven dos servicios de terceros, a los que sólo se les
+          perfiles lo devuelven tres servicios de terceros, a los que sólo se les
           envían peticiones HTTP normales sobre URLs públicas.
         </p>
         <ul>
@@ -114,13 +114,23 @@ export default function CreditsPage() {
                 SavTikPro
               </a>
               .</b>{" "}
-            Fuente principal: listado paginado de perfiles y primera opción
-            para vídeos sueltos. Es de la misma familia de producto que TikVid.
+            Fuente principal de TikTok: listado paginado de perfiles y primera
+            opción para vídeos sueltos. Es de la misma familia de producto que
+            TikVid.
+          </li>
+          <li>
+            <b>
+              <a href="https://www.snapyt.app/" target="_blank" rel="noreferrer">
+                SnapYT
+              </a>
+              .</b>{" "}
+            Fuente de YouTube: devuelve las opciones de descarga del vídeo
+            (vídeos sueltos y Shorts).
           </li>
         </ul>
         <p>
-          <b>Red.ly no es una API oficial</b> de TikVid ni de SavTikPro, ni de
-          las plataformas de vídeo. Sus endpoints y su HTML no están
+          <b>Red.ly no es una API oficial</b> de TikVid, SavTikPro ni SnapYT, ni
+          de las plataformas de vídeo. Sus endpoints y su HTML no están
           documentados, pueden cambiar en cualquier momento y estos servicios
           no patrocinan ni respaldan este proyecto. Los enlaces se citan
           únicamente para identificar de dónde sale el contenido.

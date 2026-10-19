@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { clientKey, apiLimiter } from "@/lib/ratelimit";
-import { detectPlatformSlug, sourceForPlatform } from "@/lib/sources";
-import { searchAny } from "@/lib/savetik";
-import { inputToTikTokUrl, isTikTokUrl, isProfileUrl } from "@/lib/urls";
+import { getPlatform } from "@/lib/platforms";
+import { sourceForPlatform } from "@/lib/sources";
+import { classifyInput } from "@/lib/urlrules";
 
 import { errorResponse } from "../_responses";
 
@@ -13,12 +13,13 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/search  { "url": "https://www.tiktok.com/@user/video/123" }
  *
- * Resuelve un vídeo suelto: intenta la fuente primaria (SavTikPro) y, si
- * falla, cae a TikVid. Devuelve el título, id, miniatura y las opciones de
- * descarga.
+ * Resuelve un vídeo suelto contra la fuente de su plataforma (TikTok con
+ * fallback incluido, YouTube vía SnapYT). Devuelve el título, id, miniatura y
+ * las opciones de descarga.
  *
- * La plataforma se resuelve por el host de la URL vía `lib/sources.ts`: si no
- * hay fuente verificada se responde 501 en lugar de intentar adivinar.
+ * La plataforma y el tipo de URL se deciden con `lib/urlrules.ts` antes de
+ * tocar la fuente: si no hay reglas ni fuente verificada se responde `400`/`501`
+ * en lugar de intentar adivinar.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const limit = apiLimiter.check(clientKey(request));
@@ -40,26 +41,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Cuerpo JSON inválido." }, { status: 400 });
   }
 
-  const url =
-    typeof (body as { url?: unknown })?.url === "string"
-      ? inputToTikTokUrl((body as { url: string }).url)
-      : "";
-
-  if (!isTikTokUrl(url)) {
+  const raw = typeof (body as { url?: unknown })?.url === "string"
+    ? (body as { url: string }).url
+    : "";
+  const classified = classifyInput(raw);
+  if (!classified) {
     return NextResponse.json(
-      { ok: false, error: "La URL no parece una URL válida de TikTok." },
+      { ok: false, error: "La URL no parece de una plataforma soportada." },
       { status: 400 },
     );
   }
 
-  if (isProfileUrl(url)) {
-    return NextResponse.json(
-      { ok: false, error: "Esa URL es de un perfil. Usa POST /api/profile." },
-      { status: 400 },
-    );
-  }
-
-  const source = sourceForPlatform(detectPlatformSlug(url));
+  const name = getPlatform(classified.slug)?.name ?? "esa plataforma";
+  const source = sourceForPlatform(classified.slug);
   if (!source) {
     return NextResponse.json(
       { ok: false, error: "Esa plataforma todavía no tiene una fuente verificada." },
@@ -67,8 +61,28 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  if (classified.kind === "profile") {
+    if (source.supportsProfiles === false) {
+      return NextResponse.json(
+        { ok: false, error: `Los canales de ${name} aún no están disponibles.` },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json(
+      { ok: false, error: "Esa URL es de un perfil. Usa POST /api/profile." },
+      { status: 400 },
+    );
+  }
+
+  if (classified.kind === "unsupported") {
+    return NextResponse.json(
+      { ok: false, error: `Esa URL de ${name} no corresponde a un vídeo concreto.` },
+      { status: 400 },
+    );
+  }
+
   try {
-    const result = await searchAny(url);
+    const result = await source.searchVideo(classified.url);
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     return errorResponse(error);

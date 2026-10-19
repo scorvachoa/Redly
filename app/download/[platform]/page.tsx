@@ -8,8 +8,8 @@ import { PLATFORMS, getPlatform } from "@/lib/platforms";
 /**
  * `/download/<plataforma>`
  *
- * Sólo TikTok tiene implementación real. El resto muestra «Próximamente» en
- * lugar de un formulario que no podría funcionar.
+ * Sólo TikTok y YouTube tienen implementación real. El resto muestra
+ * «Próximamente» en lugar de un formulario que no podría funcionar.
  */
 
 interface PageProps {

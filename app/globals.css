@@ -313,6 +313,27 @@ a {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+/* Select con el mismo aspecto que `.input`, pero con ancho propio (sin
+   `flex-1`): convive con los botones dentro de `.actions`. */
+.select {
+  @apply rounded-ctl border border-line bg-entry px-3 py-[13px] text-[15px] text-ink outline-none transition-[border-color,box-shadow,background-color];
+  font-family: inherit;
+}
+
+.select:focus {
+  @apply border-accent;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Etiqueta del selector de calidad del lote (junto al botón de descarga). */
+.quality {
+  @apply flex items-center gap-2;
+}
+
+.quality__label {
+  @apply text-[11px] font-bold tracking-[0.09em] text-muted uppercase;
+}
+
 /* `inline-flex` en vez del `inline-block` por defecto: el Preflight de Tailwind
    deja los `svg` en bloque, así que un icono dentro del botón se apilaba encima
    del texto. Con flex, icono y texto comparten una sola línea centrados y el
@@ -465,6 +486,29 @@ a {
 }
 
 /* --------------------------------------------------------------------------
+   Pestañas de opciones (listas largas: YouTube trae ~17 vídeos y ~7 audios)
+   -------------------------------------------------------------------------- */
+.option-tabs {
+  @apply mb-3 flex gap-2;
+}
+
+.option-tab {
+  @apply cursor-pointer rounded-full border border-line px-4 py-[7px] text-[13px] font-semibold text-muted transition-colors;
+}
+
+.option-tab:hover {
+  @apply bg-hover;
+}
+
+.option-tab[aria-selected="true"] {
+  @apply border-accent bg-surface-2 text-ink;
+}
+
+.option-tab__count {
+  @apply ml-1.5 text-[11px] font-bold opacity-70;
+}
+
+/* --------------------------------------------------------------------------
    Galería de fotos (publicaciones de carrusel de TikTok)
    -------------------------------------------------------------------------- */
 /* Cada imagen trae su propio botón; la cabecera (`.list-head`, que ya pone sus
@@ -560,6 +604,19 @@ a {
 .badge--done {
   @apply text-muted;
   background: color-mix(in srgb, var(--muted) 16%, transparent);
+}
+
+/* Mismo aspecto que `--done`, con nombre semántico para etiquetas de estado
+   (p. ej. «Sin audio» en las pestañas de YouTube). */
+.badge--muted {
+  @apply text-muted;
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+}
+
+/* «Con audio»: la pista ya trae el sonido incluido. */
+.badge--ok {
+  @apply text-ok;
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
 }
 
 /* --------------------------------------------------------------------------

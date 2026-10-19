@@ -10,9 +10,9 @@ import {
 } from "@/lib/sources";
 
 describe("registro de fuentes", () => {
-  it("sólo está registrada la fuente verificada", () => {
+  it("sólo están registradas las fuentes verificadas", () => {
     // Sólo se registra lo que se ha comprobado empíricamente.
-    expect(allSources().map((source) => source.id)).toEqual(["savetikpro"]);
+    expect(allSources().map((source) => source.id)).toEqual(["tiktok", "snapyt"]);
   });
 
   it("la fuente registrada declara la plataforma que sirve", () => {
@@ -24,16 +24,23 @@ describe("registro de fuentes", () => {
 
   it("devuelve null para plataformas sin fuente verificada", () => {
     // Existen en la navegación con ready:false, pero no tienen fuente.
-    expect(sourceForPlatform("youtube")).toBeNull();
     expect(sourceForPlatform("instagram")).toBeNull();
+    expect(sourceForPlatform("facebook")).toBeNull();
     expect(sourceForPlatform("")).toBeNull();
     expect(sourceForPlatform(null)).toBeNull();
     expect(sourceForPlatform(undefined)).toBeNull();
   });
 
   it("ignora mayúsculas y espacios en el slug", () => {
-    expect(sourceForPlatform(" TikTok ")?.id).toBe("savetikpro");
-    expect(sourceForPlatform("TIKTOK")?.id).toBe("savetikpro");
+    expect(sourceForPlatform(" TikTok ")?.id).toBe("tiktok");
+    expect(sourceForPlatform("TIKTOK")?.id).toBe("tiktok");
+    expect(sourceForPlatform(" YouTube ")?.id).toBe("snapyt");
+  });
+
+  it("declara qué fuentes admiten listados de perfil", () => {
+    // TikTok pagina perfiles; YouTube lista listas de reproducción (perfiles).
+    expect(sourceForPlatform("tiktok")?.supportsProfiles).toBe(true);
+    expect(sourceForPlatform("youtube")?.supportsProfiles).toBe(true);
   });
 });
 
@@ -69,14 +76,19 @@ describe("detectPlatformSlug", () => {
 
 describe("sourceForUrl / platformForUrl", () => {
   it("una URL de TikTok resuelve la fuente verificada", () => {
-    expect(sourceForUrl("https://www.tiktok.com/@user/video/1")?.id).toBe("savetikpro");
+    expect(sourceForUrl("https://www.tiktok.com/@user/video/1")?.id).toBe("tiktok");
     expect(platformForUrl("https://www.tiktok.com/@user")?.slug).toBe("tiktok");
   });
 
+  it("una URL de YouTube resuelve la fuente verificada (SnapYT)", () => {
+    expect(sourceForUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")?.id).toBe("snapyt");
+    expect(platformForUrl("https://youtu.be/dQw4w9WgXcQ")?.slug).toBe("youtube");
+  });
+
   it("una plataforma sin fuente devuelve null aunque exista en la navegación", () => {
-    expect(sourceForUrl("https://youtube.com/watch?v=x")).toBeNull();
+    expect(sourceForUrl("https://instagram.com/reel/x")).toBeNull();
     // La plataforma sí está registrada (para la UI), pero no hay fuente.
-    expect(platformForUrl("https://youtube.com/watch?v=x")?.slug).toBe("youtube");
+    expect(platformForUrl("https://instagram.com/reel/x")?.slug).toBe("instagram");
   });
 
   it("una URL desconocida devuelve null en ambos", () => {

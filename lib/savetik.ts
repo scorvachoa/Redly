@@ -41,6 +41,22 @@ import type { ProfileVideo, TikTokResult } from "./models";
 import { parseSearchHtml } from "./parser";
 import { buildVideoUrl, isProfileUrl, normalizeTikTokUrl } from "./urls";
 
+/**
+ * Metadatos del listado en sí (no de cada vídeo).
+ *
+ * TikTok no los aporta hoy; las listas de YouTube sí (título del `og:title` de
+ * YouTube y canal deducido del primer vídeo, vía YTMP3). La UI los usa para
+ * titular la tarjeta de resultado; si no llegan, se recurre a un texto genérico.
+ */
+export interface ProfileMeta {
+  /** Título del perfil o de la lista. */
+  title?: string | null;
+  /** Canal o usuario responsable del listado. */
+  channel?: string | null;
+  /** Nº total de elementos del listado (puede superar los ya recopilados). */
+  total?: number | null;
+}
+
 /** Resultado de una única petición de listado (una página del perfil). */
 export interface ProfilePage {
   items: ProfileVideo[];
@@ -48,6 +64,8 @@ export interface ProfilePage {
   nextCursor: string | null;
   /** Página que acaba de devolverse. */
   page: number;
+  /** Datos del listado; sólo en la primera página suelen aportarse. */
+  meta?: ProfileMeta | null;
 }
 
 /** Primera página de un perfil: así empieza siempre el cursor. */

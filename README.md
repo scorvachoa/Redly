@@ -1,15 +1,16 @@
 # Red.ly
 
 Cliente TypeScript/Next.js del flujo HTTP de **TikVid** y **SavTikPro** para
-URLs de TikTok: analiza un vídeo y muestra las opciones de descarga, o lista un
-**perfil completo** y descarga en lote, reanudando con el historial.
+URLs de TikTok, y de **SnapYT** para URLs de YouTube: analiza un vídeo y
+muestra las opciones de descarga, o lista un **perfil completo** de TikTok y
+descarga en lote, reanudando con el historial.
 
 Es una aplicación web: interfaz en el navegador + API propia que hace de proxy.
 
 **Web desplegada:** <https://red-ly.vercel.app/>
 
-> **No es una API oficial de TikVid ni de SavTikPro.** Los endpoints y el HTML
-> no están documentados y pueden cambiar en cualquier momento. El proyecto
+> **No es una API oficial de TikVid, SavTikPro ni SnapYT.** Los endpoints y el
+> HTML no están documentados y pueden cambiar en cualquier momento. El proyecto
 > trabaja únicamente con URLs públicas y peticiones HTTP normales, sin
 > autenticación, sin cookies personales y sin medidas de evasión: no se saltan
 > CAPTCHAs ni controles de acceso.
@@ -53,210 +54,92 @@ npm run smoke      # handlers de la API contra la red real
 | Ruta | Contenido |
 | --- | --- |
 | `/` | Portada: hero, plataformas, «Obtener programa» y pie |
-| `/download/<plataforma>` | Descargador. Sólo `tiktok` funciona; el resto muestra «Próximamente» |
+| `/download/<plataforma>` | Descargador. Funcionan `tiktok` y `youtube`; el resto muestra «Próximamente» |
 | `/transcript/<plataforma>` | Transcripción. Todas las plataformas muestran «Próximamente» |
 | `/privacidad` | Política de datos: qué se guarda, qué no, y con qué terceros |
 | `/creditos` | Créditos: tecnologías, iconos y licencias, despliegue y origen del proyecto |
-| `/manifest.webmanifest` | manifiesto de la PWA (desde `app/manifest.ts`) |
-| `/sw.js` | service worker (desde `public/sw.js`) |
-| `/icon.svg`, `/favicon.ico`, `/apple-icon.png`, `/icons/*` | favicon e iconos de instalación |
+| `/manifest.webmanifest`, `/sw.js` | manifiesto PWA y service worker |
 
 Plataformas: `tiktok`, `youtube`, `facebook`, `instagram`, `twitter`, `threads`
 (el registro vive en `lib/platforms.ts`). Una ruta desconocida cae en el 404
 propio, que lista las plataformas disponibles.
 
-> **Sólo TikTok está implementado.** Las demás existen en la estructura de
-> navegación, pero no se les asigna ningún endpoint: no se inventan APIs, y no
-> hay ninguna fuente comprobada para ellas. La página
+> **Sólo TikTok y YouTube están implementados.** Las demás existen en la
+> estructura de navegación, pero no se les asigna ningún endpoint: no se
+> inventan APIs, y no hay ninguna fuente comprobada para ellas. La página
 > «Próximamente» lo explica en lugar de mostrar un botón que no podría
 > funcionar. Con la transcripción pasa lo mismo en **todas** las plataformas.
 
-### Estilo
+### Estilo y PWA
 
-El CSS está en `app/globals.css` con **Tailwind CSS v4**: un `@import "tailwindcss"`
-más `@apply` sobre las clases semánticas existentes (`.hero`, `.platform-card`…),
-de modo que el JSX mantiene nombres legibles y no una pila de utilidades.
-`postcss.config.mjs` carga el plugin `@tailwindcss/postcss`; no hay `tailwind.config.js`.
+Tailwind CSS v4 en `app/globals.css`: un `@import "tailwindcss"` más `@apply`
+sobre clases semánticas (`.hero`, `.platform-card`…). El tema claro/oscuro
+funciona con `data-theme` en `<html>` (lo escribe el script del `layout.tsx`
+antes del primer pintado), no con la clase `.dark`. Los iconos de
+`components/icons.tsx` son SVG incrustados (Font Awesome 6), no `react-icons`.
 
-El tema claro/oscuro sigue funcionando con `data-theme` en `<html>` (lo escribe el
-script del `layout.tsx` antes del primer pintado) y **no** con la clase `.dark`. Los
-tokens de color se declaran en `:root` / `[data-theme="dark"]` y `@theme inline` los
-expone a Tailwind resolviendo en runtime, así que `bg-surface`, `text-ink` o
-`border-line` cambian al alternar el tema sin duplicar clases.
-
-Los iconos de `components/icons.tsx` son **SVG incrustados** (paths de Font Awesome 6,
-licencia CC BY 4.0) en lugar de `react-icons`: su barril de exports activa el
-`optimizePackageImports` de Next, que a veces referencia un chunk de proveedor
-(`vendor-chunks/react-icons`) que no llega a emitirse y la página caía con
-`Cannot find module`. Para regenerarlos hace falta `react-icons` sólo durante el
-proceso: `npm i -D react-icons && node scripts/extract-icons.cjs` (y después
-`npm rm -D react-icons`, porque no debe volver a entrar en el build).
-
-### Iconos (favicon)
-
-El favicon es una **llama** con el degradado de la marca. La fuente de verdad es
-`app/icon.svg` (viewBox `0 0 64 64`, dos `<path>` de relleno: llama exterior y
-llama interior). Next.js la emite sola como `<link rel="icon" type="image/svg+xml">`.
-
-Los ficheros derivados viven junto a ella y los genera el mismo script:
-
-| Fichero | Uso | Cómo se obtiene |
-| --- | --- | --- |
-| `app/icon.svg` | pestañas que entienden SVG | escrito a mano |
-| `app/favicon.ico` | pestañas antiguas (contenedor con PNGs de 16/32/48) | `make-favicon.cjs` |
-| `app/apple-icon.png` | iOS, 180×180 **opaco** (iOS ignora el alfa) | `make-favicon.cjs` |
-
-Para regenerar los derivados tras tocar el SVG:
-
-```sh
-node scripts/make-favicon.cjs
-```
-
-El script usa `sharp`, que Next.js ya trae como dependencia transitiva (**no**
-está declarado en `package.json` y no hace falta añadirlo). No hay que
-declarar `metadata.icons` en `layout.tsx`: la convención de ficheros de Next
-los descubre y añade los `<link>` con un hash de caché en el `href`.
-
-Al editar la forma, dos errores fáciles: una punta suave se lee como gota de
-agua, no como fuego, y un control que se cruza sobre el vértice deja un
-triángulo hueco encima de la punta. La punta debe ser un corte limpio: el
-primer control del primer segmento baja hacia la izquierda y el último del
-último baja hacia la derecha, sin llegar a cruzarse.
-
-### PWA (instalación)
-
-La web es instalable. En Android y en Chromium de escritorio muestra el botón
-**Instalar aplicación**; en iOS no existe ese botón y se añade desde el menú
-**Compartir → Añadir a pantalla de inicio**. Abierta así, ocupa su propia
-ventana (`display: standalone`) sin barra de navegador.
-
-| Pieza | Rol |
-| --- | --- |
-| `app/manifest.ts` | manifiesto → `/manifest.webmanifest`: nombre, `start_url`, `display`, iconos |
-| `public/sw.js` | service worker mínimo: cachea sólo `/_next/static/` |
-| `components/ServiceWorker.tsx` | lo registra en el cliente, y sólo en producción |
-| `components/InstallApp.tsx` | botón de instalación e instrucciones de iOS |
-
-`InstallApp` resuelve tres casos distintos: `beforeinstallprompt` (Chromium),
-instrucciones para iOS (que no implementa ese evento) y detección de «ya
-instalada» mediante `display-mode: standalone` y `navigator.standalone`. La
-tarjeta vive en la sección **Obtener programa** de la portada.
-
-Los iconos de instalación —`public/icons/icon-192.png`, `icon-512.png` y
-`maskable-512.png`— también los genera `scripts/make-favicon.cjs`. El
-`maskable` escala la llama al 66 % del lienzo: Android recorta el icono en un
-círculo del 80 % y dentro de esa zona segura no debe haber nada cortado.
-
-Dos decisiones que conviene no cambiar sin motivo:
-
-* **El service worker no cachea HTML ni `/api/*`.** Sólo los assets con hash
-  de `/_next/static/`, que son inmutables. Cachear una página o una respuesta
-  de API expone al usuario a contenido caducado —o peor, a un token de
-  descarga vencido— en un archivo de sesión que nadie vigila.
-* **`theme_color` está declarado dos veces**: en `app/manifest.ts` y en el
-  `viewport` de `app/layout.tsx`. Si cambia uno, debe cambiar el otro.
-
-En desarrollo el worker no se registra (`NODE_ENV !== "production"`): los
-rebuilds en caliente de `next dev` dejan el bundle que cachearía obsoleto y
-habría que recargar con las dev tools abiertas para ver los cambios.
-
-### Navegación y pie
-
-La cabecera (`components/SiteHeader.tsx`) lleva tres entradas: **Descargar** y
-**Transcribir**, cada una con un desplegable «Redes sociales», y **Obtener
-programa**, que salta a la sección homónima de la portada.
-
-Cada elemento del desplegable lleva el icono de la plataforma sobre su color de
-marca, el nombre, y el estado: píldora «Disponible» en la única fuente
-comprobada (TikTok) y «Próximamente» en atenuado para el resto. Transcribir
-usa `transcriptReady`, que hoy es `false` en todas. Los desplegables se abren
-con `:hover` y `:focus-within`, sin JavaScript ni client components; en móvil la
-navegación pasa a una segunda fila. El nombre de la marca no lleva etiqueta
-lateral.
-
-Hay dos detalles fáciles de romper. El menú lleva un puente invisible
-(`.nav__menu::before`, 12px hacia arriba) que cubre su `mt-2`: sin él, al bajar
-el ratón desde el disparador se cruza un hueco sin nada debajo, `:hover` se
-pierde un instante y el menú se cierra antes de llegar a los enlaces. Y el menú
-**no** anima `translateY`, sólo la opacidad: un desplazamiento movería también
-el puente y dejaría 4px sin cubrir durante la animación.
-
-La marca y el botón de tema no van pegados al borde de la ventana: el contenido
-de la cabecera vive en `.header__inner`, que replica el ancho y el padding de
-`.main`, de modo que la marca cae siempre sobre el mismo eje vertical que el
-texto. El pie (`components/SiteFooter.tsx`) sigue la misma regla, y es común a
-la portada, el descargador, «Próximamente», el 404, `/creditos` y `/privacidad`.
-
-### Ancho
-
-Todas las páginas comparten **1080px** de ancho: `.main`, `.header__inner`,
-`.site-footer__inner` y `.site-footer__legal` usan el mismo `max-width` y el
-mismo `padding-inline`, así que la portada, el descargador, «Próximamente», el
-404 y `/privacidad` se alinean sin excepción.
-
-No hay medida límite para el texto: párrafos, listas y lead de los documentos
-(`.doc p`, `.doc li`, `.doc__lead`) ocupan el ancho completo, igual que los
-títulos, las tarjetas y los formularios. Así `/creditos` y `/privacidad` no
-dejan la mitad derecha vacía.
-
-El botón de GitHub apunta a `REPO_URL` (`lib/site.ts`), con el repositorio
-público del proyecto. Con valor, el enlace aparece solo en la portada y en el
-pie; vacía, no se muestra ninguno.
+La web es instalable: manifiesto en `app/manifest.ts`, service worker mínimo
+(`public/sw.js`, cachea **sólo** `/_next/static/`, que es inmutable; cachear
+HTML o `/api/*` expondría contenido caducado o tokens vencidos) y botón de
+instalación con instrucciones de iOS en `components/InstallApp.tsx`. El
+favicon —una llama con el degradado de la marca— tiene su fuente de verdad en
+`app/icon.svg`; los derivados (`favicon.ico`, `apple-icon.png`, iconos PWA)
+se regeneran con `node scripts/make-favicon.cjs`.
 
 ### Descargador de TikTok
 
 * Pega **`@usuario`** para un perfil, o la URL completa de un **vídeo** o de un
-  **post de fotos**. Vídeo y carrusel se analizan solos y muestran título,
-  miniatura y opciones; un perfil pagina el listado hasta reunir los vídeos
-  **pendientes** y activa el botón **Descargar N vídeos**.
-* Cada descarga usa `/api/download` en streaming con barra de progreso; el
-  archivo se guarda en el navegador con nombre saneado, en la carpeta que
-  elijas (Chromium) o en Descargas.
-* El lote se ejecuta **secuencialmente** en el cliente (una petición a la vez,
-  pausa de 700 ms entre vídeos) para no saturar el origen.
-* Cada descarga **reintenta hasta 3 veces** ante `429`/`5xx` antes de rendirse
-  (honrando `Retry-After` si la trae): el límite de la API son 30 peticiones
-  por minuto y un lote largo lo tocaría inevitablemente.
-* El **historial** (`localStorage`) marca los ya bajados con el badge
-  «Ya descargado» y los excluye del lote; hay botón para borrarlo.
-* Tema claro/oscuro (botón con icono SVG), compartido entre todas las rutas.
-  Acento de marca `#fe2c55`.
+  **post de fotos**. Un perfil pagina el listado hasta reunir los vídeos
+  **pendientes** y activa **Descargar N vídeos**.
+* Cada descarga va por `/api/download` en streaming con barra de progreso;
+  **reintenta hasta 3 veces** ante `429`/`5xx`; el **historial**
+  (`localStorage`) marca los ya bajados con «Ya descargado» y los excluye del
+  lote. El lote corre en el cliente, secuencial, con 700 ms de pausa.
+* El descargador se reparte entre `Downloader.tsx` (orquestador con el estado
+  del flujo), piezas presentacionales en `components/downloader/` y
+  utilidades sin React en `lib/` (ver árbol de arquitectura).
 
-#### Estructura del descargador
+### Descargador de YouTube
 
-`Downloader.tsx` es el **orquestador**: mantiene el estado del flujo
-(URL → análisis → resultado) y coordina piezas extraídas a medida que creció
-(pasó de un único componente de 850 líneas a varias unidades):
+Mismo descargador (`/download/youtube`), con la fuente de YouTube resolviendo
+el vídeo:
 
-| Pieza | Responsabilidad |
-| --- | --- |
-| `downloader/useDestination.ts` | selector de carpeta de Chromium y fábrica de destinos |
-| `downloader/useDownloadHistory.ts` | historial reactivo sobre `lib/history.ts` |
-| `downloader/VideoPanel.tsx` | resultado de un vídeo suelto (sin estado propio) |
-| `downloader/ProfilePanel.tsx` | resultado de un perfil (sin estado propio) |
-| `downloader/ProgressBar.tsx` | barra de progreso, con variante indeterminada |
-| `lib/download-stream.ts` | `downloadWithProgress`, `formatBytes`, `isProfileLike` (sin React) |
-
-La regla que sostiene el reparto: los paneles son **presentacionales** (reciben
-props y devuelven JSX) y las utilidades viven en `lib/` sin importar React, de
-modo que se testean sin montar un componente y se reutilizan si aparece una
-segunda UI.
+* Se aceptan **vídeos sueltos**: `watch?v=`, enlaces cortos `youtu.be`,
+  `/shorts/`, `/embed/` y `/live/`. Y **listas de reproducción**
+  (`/playlist?list=…`), listadas vía YTMP3.gg (API de metadatos
+  `yt-meta.convert1s.com`); cada vídeo se resuelve después con SnapYT. Los
+  **canales** se rechazan con un mensaje claro (el listado de canales aún no se
+  ofrece).
+* Las opciones llegan **ordenadas de mayor a menor** —vídeo por resolución y
+  audio por bitrate— y, al ser una lista larga (~17 vídeos y ~7 audios), se
+  parten en **pestañas Vídeo/Audio** (TikTok, con pocas opciones, sigue en una
+  sola columna). La preselección es la **recomendada** (360p MP4 con audio).
+  Cada opción de vídeo lleva su etiqueta de audio: «Con audio» (progresiva),
+  «Se combina con audio» (las que pasan por `/api/merge`) o «Sin audio»
+  (fallback).
+* Las calidades altas se descargan **con audio**: si la opción apunta a
+  `/api/merge`, la interfaz espera a que SnapYT una las pistas y después baja
+  el MP4 por `/api/download` (ver «YouTube» → «Vídeo + audio»).
+* Una única fuente (**SnapYT**), sin cadena de respaldo. El nombre de archivo
+  usa el id de YouTube (`Redly_dQw4w9WgXcQ.mp4`).
 
 ---
 
 ## API
 
-Tres rutas bajo `/api`, implementadas como Route Handlers de Next.js:
+Cuatro rutas bajo `/api`, implementadas como Route Handlers de Next.js:
 
 | Ruta | Método | Body / Query | Descripción |
 | --- | --- | --- | --- |
 | `/api/search` | `POST` | `{ url }` | Analiza **un vídeo**: título, ID, miniatura y opciones |
 | `/api/profile` | `POST` | `{ url, max?, cursor?, page? }` | Devuelve **una página** de un perfil y el `next_cursor` |
+| `/api/merge` | `GET` | `?yt=&v=&a=` | combina vídeo+audio de YouTube en SnapYT y devuelve la URL del MP4 ya unido |
 | `/api/download` | `GET` | `?url=&name=` | hace de proxy de streaming con `Content-Disposition: attachment` |
 
 ### Paginación de perfiles
 
-`/api/profile` devuelve **una sola página** por invocación, no el perfil entero:
+`/api/profile` devuelve **una sola página** por invocación (no el perfil
+entero) con `next_cursor` para continuar:
 
 ```json
 {
@@ -269,19 +152,14 @@ Tres rutas bajo `/api`, implementadas como Route Handlers de Next.js:
 }
 ```
 
-El cliente pagina invocación a invocación reenviando `cursor` y `page`:
+* `cursor` ausente o vacío → primera página (`"0"`); `next_cursor: null` → fin.
+* `max` es el tope **por invocación** (`API_PROFILE_MAX`, por defecto 100).
+* Al paginar fuera de la función, cada llamada se mantiene corta y no se choca
+  con `maxDuration` de Vercel. En la web, el bucle se detiene cuando tiene los
+  pendientes pedidos, se agota el cursor o llega al tope de páginas.
 
-* `cursor` ausente o vacío → primera página (`"0"`).
-* `next_cursor: null` → no hay más páginas.
-* `max` es el tope **por invocación** (recortado a `API_PROFILE_MAX`); una
-  página rara vez lo alcanza, así que sirve de red de seguridad.
-
-Al paginar fuera de la función, cada llamada se mantiene corta y no se choca
-con `maxDuration: 60` de Vercel. En la web, el bucle de paginación se detiene
-cuando tiene los pendientes pedidos, se agota el cursor o llega al tope de
-páginas del análisis.
-
-Ejemplos:
+`/api/profile` acepta el perfil abreviado (`"@usuario"`); en YouTube sólo se
+admite la URL completa. Ejemplos:
 
 ```bash
 curl -X POST localhost:3000/api/search \
@@ -295,93 +173,69 @@ curl -X POST localhost:3000/api/profile \
 curl -L -o video.mp4 "localhost:3000/api/download?url=<enlace>&name=v.mp4"
 ```
 
-`/api/profile` acepta además el perfil abreviado (`"@usuario"`): la entrada se
-normaliza con el host fijo de TikTok antes de clasificarla. Un vídeo o un post
-de fotos se envía siempre con su enlace completo.
-
-Validaciones (devuelven `400` con `{ ok:false, error }`):
-
-* URL que no es de TikTok.
-* `/api/search` recibe una URL de perfil, o `/api/profile` recibe una de vídeo.
-* `max` por encima de `API_PROFILE_MAX` (límite del servidor, por defecto 100).
-* `/api/download` con un host distinto de la lista blanca.
+Validaciones (devuelven `400` con `{ ok:false, error }`): URL sin reglas
+(`lib/urlrules.ts`), `/api/search` con URL de perfil o `/api/profile` con URL
+de vídeo, contenido no resoluble (listas, portadas), `max` por encima del
+tope, y `/api/download` con un host fuera de la lista blanca.
 
 ### Anti proxy abierto
 
 `/api/download` sólo acepta hosts configurados en `ALLOWED_DOWNLOAD_HOSTS`
-(`lib/config.ts`). Si no, responde `400`: el endpoint no puede usarse como
-proxy hacia cualquier destino.
+(`lib/config.ts`); si no, responde `400`: no puede usarse como proxy hacia
+cualquier destino.
 
 ### Límite de tasa
 
-Las tres rutas comparten un único límite (`lib/ratelimit.ts`), en memoria y por
-ventana deslizante. Por defecto **30 peticiones por 60 segundos** por cliente,
-configurable con `RATE_LIMIT_MAX` y `RATE_LIMIT_WINDOW_SECONDS`.
+Las cuatro rutas comparten un único límite en memoria y por ventana deslizante
+(`lib/ratelimit.ts`): por defecto **30 peticiones por 60 segundos** por
+cliente (`RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_SECONDS`), con `429` y
+`Retry-After` al superarlo. La clave del cliente sale de `x-forwarded-for`
+(sin fiarse de las direcciones posteriores, para no dejar culpar a terceros).
 
-La clave del cliente sale de `x-forwarded-for` (la primera IP), o de
-`x-real-ip`, o `unknown` en local. Si la primera IP de la lista está vacía se
-trata como `unknown` en lugar de fiarse de las siguientes: si no, quien controla
-la cabecera podría culpar con `X-Forwarded-For: , <ip-de-otro>` y agotarle la
-cuota a un tercero.
-
-Al superarlo la respuesta es `429` con cabecera `Retry-After` y cuerpo
-`{ ok:false, error, retry_after }`.
-
-**Límite honesto**: en serverless esto es **por instancia de la función**, no
-global. Con N instancias frías el tope real puede ser N veces mayor. Sigue
-siendo útil —frena el abuso desde un mismo cliente— pero no es un techo
-absoluto. Si llega el momento de necesitar uno, sólo hay que sustituir la clase
-`RateLimiter` por otra implementación de la misma interfaz: las rutas no se
-enteran.
+**Límite honesto**: en serverless esto es **por instancia**, no global. Sigue
+frenando el abuso desde un mismo cliente, pero no es un techo absoluto.
 
 ### Caché de páginas de perfil
 
-`/api/profile` cachea en memoria el resultado de cada página durante
-**60 segundos** (`PROFILE_CACHE_TTL_MS`), con techo de 200 entradas y LRU
-(`lib/cache.ts`). La clave es `url|cursor|page`, así que dos personas abriendo
-el mismo perfil sólo generan una petición al origen.
-
-El TTL es deliberadamente corto: cada tarjeta trae la URL de descarga, que es
-un token JWT de SnapCDN con vida de ~1 hora. Cachear más tiempo que eso
-significaría servir enlaces muertos; con 60 s se aprovecha el repetido sin
-arriesgar nada. La respuesta incluye `"cached": true` cuando sale de la caché.
-
-Igual que el límite, la caché es **de memoria de proceso**: cada instancia de la
-función tiene la suya. No pretende ser una caché compartida, sólo evitar
-repeticiones inmediatas.
+`/api/profile` cachea cada página **60 segundos** (`PROFILE_CACHE_TTL_MS`),
+con techo de 200 entradas y LRU (`lib/cache.ts`). El TTL es corto a propósito:
+cada tarjeta trae una URL de descarga con vida de ~1 hora, y más allá se
+servirían enlaces muertos. Igual que el límite, la caché es de memoria de
+proceso.
 
 ### Fuentes de contenido
 
-Las rutas no instancian `SavetikSource` a pelo: resuelven la fuente por el host
-de la URL a través de `lib/sources.ts`, que expone un contrato (`ContentSource`)
-y un registro.
+Las rutas no instancian proveedores a pelo: la clasificación sale de
+`lib/urlrules.ts` y la fuente se resuelve por slug a través de
+`lib/sources.ts` (contrato `ContentSource` + registro):
+
+| Fuente | `id` | Plataforma | Notas |
+| --- | --- | --- | --- |
+| `TikTokSource` | `tiktok` | TikTok | `searchVideo` con fallback SavTikPro → TikVid, perfiles en `SavetikSource` |
+| `SnapYTSource` | `snapyt` | YouTube | única fuente (sin cadena de respaldo); vídeo suelto + listas (vía YTMP3.gg) |
 
 ```ts
 interface ContentSource {
   readonly id: string;
   readonly platforms: readonly string[];
+  readonly supportsProfiles?: boolean;   // true en YouTube (listas de reproducción)
   searchVideo(url: string): Promise<TikTokResult>;
   listProfilePage(url, cursor?, page?, limit?): Promise<ProfilePage>;
 }
 ```
 
-Hoy sólo está registrada la fuente verificada de TikTok. Añadir otra plataforma
-significa implementar el contrato y añadirla al registro, sin tocar las rutas.
-Las plataformas sin fuente reciben `501`, no un intento de adivinar.
-
-El motivo es que `savetikpro.com` es un tercero sin API documentada: si un día
-deja de funcionar o hay que cambiar de proveedor, el cambio se confina en un
-módulo.
+Añadir otra plataforma significa implementar el contrato y registrarla, sin
+tocar las rutas: sin reglas → `400`; con reglas pero sin fuente → `501`.
+SavTikPro, TikVid y SnapYT son terceros sin contrato estable; si hay que
+cambiar de proveedor, el cambio se confina en un módulo.
 
 ### CORS y despliegue en Vercel
 
-El navegador habla **sólo con la API de Red.ly**, que a su vez habla con
-TikVid/SavTikPro. Así no hay CORS contra terceros y el flujo de cabeceras de
-navegador queda centralizado en `lib/config.ts`.
-
-`vercel.json` fija `maxDuration: 60` para `app/api/**`. El lote **no** corre en
-el servidor (sin FS persistente entre invocaciones): la cola vive en el
-navegador.
+El navegador habla **sólo con la API de Red.ly**, que a su vez habla con los
+servicios de terceros: no hay CORS hacia ellos. `vercel.json` fija
+`maxDuration: 60` para `app/api/**`; `/api/merge` lo sube a `120` porque
+espera la cola de combinación de SnapYT. El lote **no** corre en el servidor
+(sin FS persistente entre invocaciones): la cola vive en el navegador.
 
 ---
 
@@ -394,52 +248,30 @@ saneado (`@scout2015` → `scout2015/`):
 Carpeta elegida/            ← o «Descargas» del navegador
   scout2015/
     Redly_7694475743509646622.mp4
-  otroperfil/
-    Redly_9999000000000000001.mp4
 ```
-
-El navegador no permite elegir destino salvo con la **File System Access API**,
-así que hay dos caminos:
 
 | Modo | Cómo se guarda | Navegadores |
 | --- | --- | --- |
-| **Elegir carpeta** (botón) | `showDirectoryPicker()` y escritura directa con `createWritable()`, **en streaming** (sin buffer en RAM). Crea la subcarpeta del perfil dentro de la elegida | Chrome, Edge, Opera |
-| **Descargas del navegador** (por defecto) | `a[download]` con nombre `perfil/archivo.mp4`: Chrome y Edge crean la subcarpeta; Firefox y Safari la ignoran y dejan el archivo plano | Todos |
+| **Elegir carpeta** (botón) | `showDirectoryPicker()` y escritura directa en streaming (`lib/fsaccess.ts`) | Chrome, Edge, Opera |
+| **Descargas del navegador** (por defecto) | `a[download]` con nombre `perfil/archivo.mp4`; Firefox y Safari dejan el archivo plano | Todos |
 
-* `showDirectoryPicker` exige **contexto seguro** (HTTPS o `localhost`).
-* La carpeta elegida vive **sólo en memoria de la sesión**: al recargar hay que
-  volver a elegirla (los `FileSystemDirectoryHandle` no se serializan).
-* Al escribir con el picker **no aparece el diálogo «Guardar como»**, por eso la
-  fila de destino se muestra siempre en la interfaz.
-* Si el permiso se revoca (`NotAllowedError`) se limpia la selección y se pide
-  elegir la carpeta de nuevo.
-
-La lógica vive en `lib/fsaccess.ts` (apt navegador, sin imports de `node:*`).
+La carpeta elegida vive sólo en memoria de la sesión (los
+`FileSystemDirectoryHandle` no se serializan) y exige contexto seguro (HTTPS o
+`localhost`).
 
 ---
 
 ## Historial de descargas
 
 Evita repetir vídeos ya bajados. Guarda **sólo** estado, nombre de archivo,
-bytes y título — **nunca URLs ni tokens**, que caducan en ~1 hora.
+bytes y título — **nunca URLs ni tokens**, que caducan pronto — en
+`localStorage` (`redly-history-v1`), sólo en el navegador.
 
-| Dónde se guarda | Clave |
-| --- | --- |
-| `localStorage` del navegador | `redly-history-v1` |
-
-El historial vive **sólo en tu navegador**: Vercel no tiene sistema de archivos
-persistente entre invocaciones, así que nada se sincroniza con el servidor.
-
-### En la web
-
-* El análisis de un perfil pagina hasta reunir los **pendientes** que pidas
-  (por defecto 100); los ya descargados aparecen con el badge **"Ya descargado"**,
-  atenuados y con la casilla desmarcada.
-* Contador `Pendientes · Ya descargados · Páginas`.
-* El lote sólo baja las casillas marcadas, y cada vídeo se marca al terminar:
+* El análisis de un perfil pagina hasta reunir los **pendientes**; los ya
+  descargados aparecen con «Ya descargado», atenuados y desmarcados.
+* El lote sólo baja las casillas marcadas y cada vídeo se marca al terminar:
   si el navegador se cierra a mitad, lo ya bajado no se repite.
-* Botón **"Borrar historial"** con el total de vídeos registrados.
-* En modo privado (sin `localStorage`) la app sigue funcionando pero avisa de
+* Botón **"Borrar historial"**; en modo privado la app funciona pero avisa de
   que cada análisis empezará de cero.
 
 ---
@@ -459,12 +291,13 @@ Redly/
 │   ├── favicon.ico             # derivado: 16/32/48 vía scripts/make-favicon.cjs
 │   ├── apple-icon.png          # derivado: 180x180 opaco para iOS
 │   ├── manifest.ts             # manifiesto PWA (convención de ficheros de Next)
-│   ├── download/[platform]/    # /download/tiktok (UI completa) | resto: "Próximamente"
+│   ├── download/[platform]/    # /download/{tiktok,youtube} (UI) | resto: "Próximamente"
 │   ├── transcript/[platform]/  # /transcript/* → todas "Próximamente"
 │   └── api/
 │       ├── _responses.ts       # errorResponse() compartido (archivo privado)
 │       ├── search/route.ts     # POST: analiza un vídeo
 │       ├── profile/route.ts    # POST: una página de perfil + next_cursor
+│       ├── merge/route.ts      # GET: combina vídeo+audio (SnapYT vd_mux)
 │       └── download/route.ts   # GET: streaming + lista blanca de hosts
 │
 ├── public/                     # estáticos servidos en la raíz del sitio
@@ -477,7 +310,7 @@ Redly/
 │   ├── ThemeToggle.tsx         # tema claro/oscuro (sólo lee al montar)
 │   ├── ServiceWorker.tsx       # registra /sw.js, sólo en producción
 │   ├── InstallApp.tsx          # botón de instalación + instrucciones iOS
-│   ├── Downloader.tsx          # orquestador de la UI de TikTok (estado del flujo)
+│   ├── Downloader.tsx          # orquestador de la UI del descargador (estado del flujo)
 │   ├── downloader/             # piezas del descargador, extraídas de Downloader
 │   │   ├── DestinationRow.tsx  # fila de destino (carpeta elegida + estado)
 │   │   ├── VideoPanel.tsx      # resultado de un vídeo suelto (presentacional)
@@ -494,17 +327,21 @@ Redly/
 │   ├── exceptions.ts           # jerarquía TikVidError
 │   ├── models.ts               # TikTokResult, ProfileVideo, optionLabel, bestQualityOption
 │   ├── platforms.ts            # registro de plataformas (fuente única de rutas)
-│   ├── sources.ts              # contrato ContentSource + registro de fuentes
+│   ├── sources.ts              # contrato ContentSource + registro (TikTokSource, SnapYTSource)
+│   ├── urlrules.ts             # reglas de URL por plataforma (clasificación de la entrada)
 │   ├── site.ts                 # constantes de UI (REPO_URL, enlace de la app)
 │   ├── ratelimit.ts            # límite de tasa por cliente (ventana deslizante)
 │   ├── cache.ts                # TtlCache con LRU + caché de páginas de perfil
 │   ├── download-stream.ts      # descarga con progreso en el navegador (sin React)
 │   ├── sanitize.ts             # nombres de archivo/carpeta (apt navegador)
-│   ├── urls.ts                 # validación, normalización y handle de perfil
+│   ├── urls.ts                 # URLs de TikTok: validación, handle y carpeta
+│   ├── youtube-urls.ts         # URLs de YouTube: vídeo, canal y lista (apt navegador)
 │   ├── http.ts                 # fetch con timeouts, reintentos y backoff
 │   ├── parser.ts               # HTML -> TikTokResult (cheerio, selectores con fallback)
 │   ├── client.ts               # TikVidClient: POST /api/ajaxSearch
 │   ├── savetik.ts              # SavTikPro: página única, perfiles, 1 vídeo, searchAny
+│   ├── snapyt.ts               # SnapYT: YouTube en 3 pasos vía admin-ajax (vídeo + listas)
+│   ├── ytmp3.ts                # YTMP3.gg: listas vía API de metadatos yt-meta (+ og:title)
 │   ├── history.ts              # historial de descargas (storage inyectable)
 │   ├── fsaccess.ts             # sinks de escritura + selector de carpeta (web)
 │   └── downloader.ts           # resolveUrl (redirects), sanitizeFilename, streaming
@@ -513,7 +350,7 @@ Redly/
 ├── scripts/extract-icons.cjs   # regenera components/icons.tsx
 ├── scripts/make-favicon.cjs    # regenera favicon.ico, apple-icon.png e iconos PWA (usa sharp)
 ├── postcss.config.mjs          # plugin @tailwindcss/postcss
-├── tests/                      # vitest, sin red (+ fixtures/*.html)
+├── tests/                      # vitest, sin red (+ fixtures: HTML y JSON)
 ├── vercel.json                 # framework nextjs, maxDuration 60
 ├── vitest.config.ts            # alias @/ + env en cero para reintentos/pausas
 └── .env.example
@@ -531,51 +368,32 @@ usa directamente (es lo que permite el destino de descargas y el historial web).
 
 ---
 
-## Flujo HTTP
+## Flujo HTTP (TikTok)
 
-1. Validación de la URL (debe ser `tiktok.com` o un subdominio) — `lib/urls.ts`.
-2. Petición (headers centralizados en `lib/config.ts`):
+1. Clasificación de la URL por plataforma (`lib/urlrules.ts`) y validación de
+   la forma (`lib/urls.ts`: debe ser `tiktok.com` o un subdominio).
+2. `POST https://tikvid.io/api/ajaxSearch` con headers de navegador
+   (`Content-Type: application/x-www-form-urlencoded`, `X-Requested-With:
+   XMLHttpRequest`), payload `q=<URL_TIKTOK>&lang=en`. Sin esas cabeceras,
+   Cloudflare responde `403`. La respuesta `{ "status": "ok", "data": "<HTML>" }`
+   pasa a `parseSearchHtml()` (cheerio). No se copian cookies ni tokens.
+3. **Perfil (SavTikPro)**: `POST https://savetikpro.com/api/ajaxSearch` con
+   `q`, `cursor`, `page` y `lang`; `cursor=""` o una `q` con barra final dan
+   `404`, así que se normaliza antes de enviar.
 
-```http
-POST https://tikvid.io/api/ajaxSearch
-Content-Type: application/x-www-form-urlencoded; charset=UTF-8
-X-Requested-With: XMLHttpRequest
-Accept: application/json, text/javascript, */*; q=0.01
-```
-
-3. Payload: `q=<URL_TIKTOK>&lang=en`
-4. Respuesta: `{ "status": "ok", "data": "<HTML>" }`
-5. `data` pasa a `parseSearchHtml()` (cheerio).
-
-Sin las cabeceras de navegador, Cloudflare responde `403` con "Just a moment...".
-No se copian cookies ni tokens del navegador.
-
-**Perfil (SavTikPro)**: `POST https://savetikpro.com/api/ajaxSearch` con
-`q`, `cursor`, `page` y `lang`. `cursor=""` devuelve `404`, y una `q` con
-barra final también: se normaliza antes de enviar.
-
-### Reintentos y timeouts
-
-* `REQUEST_TIMEOUT = 30`, `DOWNLOAD_TIMEOUT = 120` (configurables por `.env`).
-* `RETRY_ATTEMPTS = 3` con backoff exponencial breve, sólo ante errores
-  transitorios: timeouts, fallos de conexión y `429/500/502/503/504`.
+Reintentos y timeouts: `REQUEST_TIMEOUT = 30`, `DOWNLOAD_TIMEOUT = 120`,
+`RETRY_ATTEMPTS = 3` con backoff breve, sólo ante transitorios (timeouts,
+conexión y `429/5xx`).
 
 ---
 
-## Parsing
+## Parsing (TikTok)
 
 No depende de una estructura exacta: para cada dato se prueba una lista de
-selectores priorizados y, si ninguno funciona, se devuelve `None` sin romper la
-ejecución:
-
-* **Título**: `div.thumbnail h3` → `div.content h3` → `h3` → `h1` → `[class*=title]`
-* **Thumbnail**: `div.thumbnail img` → `div.image-tik img` → `video[poster]` → primer `img`
-* **Video ID**: `input#TikTokId` → enlaces `tiktok.com/@user/video/<id>` → atributos `data-*`
-* **Opciones**: `a.tik-button-dl` → `.dl-action a[href]` → enlaces con hosts de CDN
-* **Fotos (carrusel)**: `.photo-list .download-items__btn a[href]`, un enlace
-  por imagen, con su miniatura en `.download-items__thumb img`
-
-Se excluyen enlaces de navegación y se deduplican las URLs repetidas.
+selectores priorizados y, si ninguno funciona, se devuelve vacío sin romper la
+ejecución (título, thumbnail, video ID, enlaces de descarga y, en el modo
+fotos, los items del carrusel). Se excluyen enlaces de navegación y se
+deduplican las URLs.
 
 | Botón | `format` | `quality` | `kind` |
 | --- | --- | --- | --- |
@@ -584,52 +402,122 @@ Se excluyen enlaces de navegación y se deduplican las URLs repetidas.
 | `Download Photo` | `jpeg` | — | `image` |
 | `Download MP3` | `mp3` | `audio` | `audio` |
 
-### Publicaciones de fotos (carrusel)
+Las **publicaciones de fotos** traen un botón por imagen (no calidades), se
+añaden por delante de las demás para que la selección automática tome la foto
+si no hay MP4, y la extensión se lee del `filename` del JWT de
+`pro.snapcdn.app` (con `jpeg` de reserva). En la web se presentan como
+galería, con «Descargar todas» y numeración por foto. **Sólo por URL de
+post**: el listado de perfil de SavTikPro no incluye publicaciones de fotos
+(verificado empíricamente), así que nunca las traerá.
 
-Las publicaciones de fotos de TikTok (`photomode`) traen un botón por imagen
-en lugar de calidades de vídeo. Se añaden **por delante** de las demás
-opciones, de modo que cuando el post no lleva ningún MP4 la selección
-automática toma la imagen en lugar de caer al MP3. Cada opción de foto
-conserva su miniatura propia.
+### URLs temporales y descarga
 
-La extensión se lee del campo `filename` del JWT de `pro.snapcdn.app`
-(`SaveTikPro.com_<id>_<n>.jpeg`); si el token no es un JWT legible, se cae a
-`jpeg` por contexto.
-
-En la web se presentan como galería con descarga individual y «Descargar
-todas». El nombre va numerado (`Redly_<id>_<n>.jpeg`) para que no se pisen,
-y el historial usa una clave por foto (`<id>#<n>`).
-
-> **Sólo por URL de post.** El listado de perfil de SavTikPro **no incluye**
-> las publicaciones de fotos (verificado el 2026-10-14: 232 tarjetas reales de
-> 4 perfiles, 0 con miniatura `photomode` y 0 con extensión distinta de
-> `mp4`), así que el listado de perfil nunca las traerá. Ver «Limitaciones».
+Las opciones apuntan a enlaces firmados de CDN (`pro.snapcdn.app` con JWT de
+~1 hora, o dominios de TikTok). El proyecto no las guarda, no las registra en
+logs ni las versiona: sólo las usa en la ejecución.
+`resolveUrl()` (`lib/downloader.ts`) sigue las redirecciones manualmente, y
+`/api/download` devuelve el cuerpo al navegador como stream, sin
+materializarlo en el servidor. Los nombres se sanean localmente
+(`Redly_<id>.<ext>`, sin `..`, `/`, `\` ni nombres reservados de Windows).
 
 ---
 
-## SnapCDN y URLs temporales
+## YouTube
 
-Algunas opciones apuntan a `https://pro.snapcdn.app/dl?token=...` (JWT, caduca
-en ~1 hora) y otras son URLs directas del CDN (`v16m.tiktokcdn-us.com`, ...).
-`resolveUrl()` sigue las redirecciones manualmente (hasta `MAX_REDIRECTS`).
+YouTube se resuelve con **una única fuente, SnapYT** (`SnapYTSource`, sin
+cadena de respaldo) para vídeos sueltos, y **YTMP3.gg** para el listado de
+listas de reproducción (ver más abajo). El flujo de SnapYT —verificado
+empíricamente, sin WAF— usa el endpoint WordPress `admin-ajax.php` en tres
+pasos:
 
-Estas URLs están **firmadas y son temporales**. El proyecto:
+1. **Nonce**: `POST action=vd_fresh_nonce` → `{ success, data: { nonce } }`.
+2. **Resolución**: `POST action=process_video_url` con `video_url` y
+   `security=<nonce>` → `{ success, data: { redirect: "…/video-preview/?…" } }`.
+3. **Preview**: `GET` esa URL; el HTML trae un `<select id="fmt-select">` con
+   todas las opciones en `<option data-kind data-size data-force>`.
 
-* no las guarda en base de datos,
-* no las escribe en archivos permanentes,
-* no las registra completas en logs (se enmascaran),
-* no las versiona en Git,
-* sólo las usa durante la ejecución.
+El binario no se sirve de `googlevideo.com` directamente: pasa por el proxy de
+SnapYT (`action=snapyt_force_download`), que responde `Content-Disposition:
+attachment`. Por eso `snapyt.app` y `googlevideo.com` están en
+`ALLOWED_DOWNLOAD_HOSTS`.
 
----
+Reglas comprobadas (fixture compartido con los tests:
+`tests/fixtures/snapyt_preview.html`):
 
-## Descarga
+* Sin `fmt-select`, o con opciones sin `data-force`, no hay nada que descargar.
+* `data-kind` decide el tipo: `video+audio`/`video-only` → vídeo,
+  `audio-only` → audio.
+* Las opciones se reordenan de mayor a menor: vídeo por resolución y audio por
+  bitrate, con el audio al final; la preselección de la UI es la recomendada
+  (la progresiva «Recommended», que ya trae audio).
+* La validación de forma va antes de cualquier petición: canales y listas no
+  llegan ni a pedir el nonce (`supportsProfiles: false`; `/api/profile` → `501`).
+* Las URLs de descarga traen parámetros temporales (`nonce`, `t`): se piden y
+  se consumen al momento.
 
-`/api/download` sigue las redirecciones de la URL temporal y devuelve el cuerpo
-al navegador como stream, sin materializarlo en el servidor.
+### Vídeo + audio (combinación)
 
-Los nombres se sanean localmente (`Redly_<id>.<ext>`): se eliminan caracteres
-inválidos, `..`, `/`, `\` y se respetan los nombres reservados de Windows.
+Las calidades altas (`data-kind="video-only"`, de 144p a 2160p) **no llevan
+audio**: está en pistas aparte. Sólo la progresiva recomendada (360p MP4) y el
+audio se descargan directas. Para entregar alta calidad con sonido, SnapYT
+ofrece **combinación server-side** en su web (`action=vd_mux_start` →
+`vd_mux_status` → `vd_mux`, que sirve el MP4 ya unido).
+
+Red.ly lo expone en tres piezas:
+
+* **`lib/snapyt.ts`** — si el preview trae el formulario de combinación
+  (`#merge-link`, selects `#mux-video`/`#mux-audio`, audio por defecto), las
+  opciones `video-only` entregan una **URL relativa** `/api/merge?yt&v&a` en
+  lugar de `data-force`. El servidor valida los índices contra el preview
+  fresco, arranca la combinación (con un reintento por la ruta de reserva de
+  SnapYT), espera el resultado con un tope de 90 s (cancelando el trabajo si
+  se pasa) y valida el host del enlace final contra la lista blanca.
+* **`app/api/merge/route.ts`** — `GET /api/merge?yt&v&a`: límite de tasa y
+  validación de la URL de YouTube y de los índices; devuelve
+  `{ ok: true, url }` (errores: `400`, `410` si el servicio no lo resuelve,
+  `502`, `429`; `maxDuration = 120`).
+* **`components/Downloader.tsx`** — si `option.url` empieza por `/`, primero
+  espera la combinación («Combinando vídeo y audio en el servidor…») y
+  después descarga el MP4 por `/api/download` de siempre.
+
+**Fallback**: si SnapYT retira el formulario, las opciones conservan su
+`data-force` y se descargan como antes —vídeo **sin audio**— sin romper nada.
+
+### Listas de reproducción
+
+Las listas (`/playlist?list=…`) se listan con **YTMP3.gg** (`lib/ytmp3.ts`),
+cuya API de metadatos `yt-meta.convert1s.com` sirve el contenido de la lista
+sin clave, WAF ni Turnstile (verificado empíricamente):
+
+1. `GET https://yt-meta.convert1s.com/playlist?id=<PL…>` → `{ nextPageToken?,
+   items: [{ id, title, channel, thumbnail }] }`, con hasta **100** vídeos por
+   página. `pageToken` es un token opaco de continuación que se devuelve tal
+   cual en la petición siguiente.
+2. El servicio **no** expone el título de la lista ni su total: el título se
+   recupera del `og:title` de la propia página pública de YouTube (mejor
+   esfuerzo; si falla, la UI degrada a un texto genérico) y el canal se deduce
+   del primer vídeo listado.
+
+Cada vídeo se convierte en `ProfileVideo` con `url` y `postUrl` apuntando al
+watch URL: la descarga por lotes resuelve la calidad de cada uno vía
+`/api/search` (SnapYT) con `batchOption` (`lib/models.ts`), que la UI expone
+como selector con tres modos:
+
+* **Recomendada (con audio)** — la mejor opción directa, ya completa (p. ej.
+  la progresiva de 720p). Es el comportamiento histórico y el más rápido.
+* **Máxima calidad (con combinación)** — la de mayor resolución entre las
+  útiles, incluida la que SnapYT sirve como `/api/merge?…` (1080p vídeo+audio
+  unidos en su servidor). Cada vídeo suma una llamada extra y puede tardar
+  ~90 s esperando la cola de SnapYT; las pistas mudas sin combinación se
+  descartan para no bajar un vídeo sin sonido.
+* **Solo audio** — sólo la pista de sonido de cada vídeo (MP3 convertido u
+  opus/m4a original, la de mayor bitrate), descargada directamente sin
+  combinación. Si un vídeo no ofrece pista de audio, se omite y se cuenta en
+  el resumen del lote en lugar de bajar su vídeo en silencio.
+
+Límites: hasta 100 vídeos por página (paginación por `pageToken`), **sólo
+listas** —los canales se rechazan— y el servicio no aporta vistas ni el total
+de la lista.
 
 ---
 
@@ -639,22 +527,27 @@ inválidos, `..`, `/`, `\` y se respetan los nombres reservados de Windows.
 npm test
 ```
 
-131 tests, **sin Internet**:
+205 tests en 16 ficheros, **sin Internet** (mock de `fetch` encolado y fixtures
+HTML anonimizadas en `tests/fixtures/`, con pids/nonces sustituidos por
+valores ficticios):
 
-* `tests/platforms.test.ts`: registro de plataformas (sólo TikTok disponible, ninguna con transcripción, slugs únicos), `getPlatform` e `isReady`.
-* `tests/sources.test.ts`: contrato `ContentSource`, detección de plataforma por host (subdominios, host que sólo termina igual) y que las plataformas sin fuente devuelven `null`.
-* `tests/urls.test.ts`: validación y normalización de URLs (vídeo, perfil, subdominios, `@usuario`, barra final) y `profileHandle`/`profileFolderName` (destino por perfil).
-* `tests/sanitize.test.ts`: `sanitizeFilename` (traversal, reservados de Windows, truncado con extensión) y `sanitizeFolderName` (carpetas).
-* `tests/parser.test.ts`: título, thumbnail, video ID, MP4/HD/MP3, elementos ausentes, HTML incompleto, deduplicación.
-* `tests/models.test.ts`: `bestQualityOption` (elige el HD, cae al estándar y no confunde el audio) para la descarga en masa de máxima calidad.
-* `tests/savetik.test.ts`: clasificación de URLs, tarjetas de perfil, página única (`listProfilePage`) con cursor/`page`, `404` y reintentos, detalle de vídeo, `searchAny` (mock de `fetch` global) y **selectores con fallback** (clases internas renombradas, enlace sin `.pro-dl-link`, tarjeta sin enlace).
-* `tests/ratelimit.test.ts`: ventana deslizante, aislamiento por clave, liberación al avanzar el tiempo, purga de claves muertas y extracción de IP del cliente.
-* `tests/cache.test.ts`: TTL, techo LRU, contadores de aciertos y la clave de caché de páginas de perfil.
-* `tests/download-stream.test.ts`: `formatBytes`, `isProfileLike` y `progressLabel`.
-* `tests/history.test.ts`: `mark`/`isDone`/`clear`, persistencia entre instancias, que **no** guarda URLs ni tokens, storage nulo y storage que lanza al escribir.
-
-Los fixtures `tests/fixtures/*.html` son copias anonimizadas del HTML real
-(tokens sustituidos por valores ficticios), compartidos con el PoC Python.
+* `platforms` · `sources` · `urlrules` · `urls` · `youtube-urls` — registro de
+  plataformas/fuentes, contrato `ContentSource` y validación de URLs.
+* `snapyt` (22) — preview → modelo (orden, `data-kind`, merge), flujo de tres
+  pasos, reintentos y errores.
+* `ytmp3` (9) — listas de YouTube vía YTMP3.gg: mapeo a `ProfileVideo`, título
+  (`og:title`) y canal en `meta`, paginación por token opaco, rechazo de
+  canales, 500 del servicio y respuesta no JSON.
+* `merge` — `prepareMergedDownload` end-to-end: happy path, validaciones de
+  índices, reintento de reserva, puerta `retry_in`, estado `404` y lista
+  blanca de hosts.
+* `savetik` (25) y `parser` — TikVid/SavTikPro: perfiles paginados,
+  selección con fallback de selectores, carrusel de fotos.
+* `ratelimit` · `cache` · `history` · `download-stream` · `sanitize` —
+  utilidades del núcleo.
+* `models` — etiquetas y selección de calidad: `bestQualityOption` y
+  `batchOption` (recomendada/máxima/solo audio del lote, descarte de pistas
+  mudas, elección de la pista de audio de mayor bitrate).
 
 Smoke de red (opcional, **sí** necesita Internet):
 
@@ -662,8 +555,11 @@ Smoke de red (opcional, **sí** necesita Internet):
 npm run smoke   # invoca los handlers de /api/* con Request reales
 ```
 
-Cubre además la paginación real: pide la página 1 de un perfil, sigue el
-`next_cursor` y comprueba que la página 2 no se solapa con la primera.
+Cubre la paginación real de un perfil (sigue el `next_cursor` y comprueba que
+la página 2 no se solapa), el flujo de combinación de YouTube completo:
+opción máxima → `/api/merge` → URL temporal → bytes del MP4 con audio por
+`/api/download`, y el listado de una lista de reproducción real vía
+YTMP3.gg (`postUrl` apunta al watch URL de cada vídeo).
 
 ---
 
@@ -675,6 +571,9 @@ entorno, sin sobreescribir valores ya definidos):
 ```text
 SAVETIK_BASE_URL / SAVETIK_AJAX_SEARCH_URL / SAVETIK_HOME_PATH / SAVETIK_LANG
 TIKVID_BASE_URL / TIKVID_AJAX_SEARCH_URL
+SNAPYT_BASE_URL / SNAPYT_AJAX_URL   # fuente de YouTube (SnapYT)
+YT_YTMP3_META_BASE_URL / YT_YTMP3_PLAYLIST_PATH / YT_YTMP3_MAX_PER_PAGE
+                            # listas de YouTube (YTMP3.gg, API de metadatos)
 REQUEST_TIMEOUT / DOWNLOAD_TIMEOUT / MAX_REDIRECTS
 RETRY_ATTEMPTS / RETRY_BACKOFF_SECONDS
 API_PROFILE_MAX              # tope de vídeos POR INVOCACIÓN (no por perfil)
@@ -685,11 +584,9 @@ PROFILE_CACHE_TTL_MS      # TTL de la caché de páginas de perfil
 `RATE_LIMIT_*` y `PROFILE_CACHE_TTL_MS` se leen directamente en
 `lib/ratelimit.ts` y `lib/cache.ts` (no pasan por `lib/config.ts`) para que
 cada módulo sea autosuficiente; el efecto es el mismo.
-
-`ALLOWED_DOWNLOAD_HOSTS` **no** es variable de entorno: es una constante con la
-lista fija de CDNs, dentro de `lib/config.ts`.
-
-Copia `.env.example` a `.env.local` para sobreescribir valores.
+`ALLOWED_DOWNLOAD_HOSTS` **no** es variable de entorno: es una constante con
+la lista fija de CDNs, dentro de `lib/config.ts`. Copia `.env.example` a
+`.env.local` para sobreescribir valores.
 
 ---
 
@@ -712,25 +609,10 @@ Notas:
 
 ---
 
-## Descubrimientos documentados (no implementados)
-
-El HTML de TikVid contiene un bloque JavaScript con estas variables:
-
-```javascript
-k_exp = "...";
-k_token = "...";
-k_url_convert = "https://s1.tik-cdn.com/api/json/convert";
-```
-
-**No se usa ese endpoint.** Antes de convertirlo en un módulo hay que verificar
-en DevTools si realmente se llama, con qué método, payload y respuesta.
-
----
-
 ## Limitaciones
 
-* TikVid y SavTikPro no ofrecen APIs públicas documentadas: los endpoints, el
-  HTML, las clases CSS y SnapCDN pueden cambiar sin aviso.
+* TikVid, SavTikPro y SnapYT no ofrecen APIs públicas documentadas: los
+  endpoints, el HTML, las clases CSS y los CDNs pueden cambiar sin aviso.
 * El acceso puede estar protegido por Cloudflare; una respuesta HTML en lugar
   de JSON se reporta como error claro.
 * Las URLs temporales expiran (`403/404/410`). Si el token caducó, hay que
@@ -739,11 +621,28 @@ en DevTools si realmente se llama, con qué método, payload y respuesta.
   clases de las tarjetas, habrá que ajustar `lib/savetik.ts`.
 * Las **publicaciones de fotos** (carrusel) sólo se pueden descargar analizando
   su URL individual: el listado de perfil de SavTikPro **no las incluye** y cada
-  tarjeta trae un único enlace directo (ver «Parsing» → «Publicaciones de fotos»).
+  tarjeta trae un único enlace directo (ver «Parsing»).
 * El scraping directo de `tiktok.com/@usuario` **no está implementado** (WAF).
-* Sólo se soporta **TikTok**. Las rutas `/download/{youtube,facebook,…}` y
-  `/transcript/*` existen en la navegación pero muestran «Próximamente»: no hay
-  ninguna fuente comprobada para ellas y no se inventan endpoints.
+* En YouTube están el **vídeo suelto** y las **listas de reproducción** (vía
+  YTMP3.gg, hasta 100 vídeos por página): los **canales** y las
+  **transcripciones** no tienen soporte, y las URLs de descarga de SnapYT
+  llevan parámetros temporales que conviene consumir al momento. El lote de una
+  lista baja por defecto la mejor opción directa de cada vídeo y permite elegir
+  **máxima calidad**, que usa la combinación de SnapYT una vez por vídeo (más
+  lento y con llamada extra a `/api/merge`, compartiendo el límite de tasa de
+  30 req/60 s por instancia).
+* La API de metadatos de YTMP3 **no trae vistas ni el total de la lista** —ni
+  de la lista ni de cada vídeo—, por lo que la tarjeta de resultado muestra el
+  título (del `og:title` de YouTube), el canal (deducido del primer vídeo) y el
+  recuento de los ya listados, pero no reproducciones ni el total real.
+* Las calidades altas de YouTube se descargan **con audio** combinando las
+  pistas en el servidor de SnapYT (ver «YouTube» → «Vídeo + audio»); la
+  combinación depende de la cola de esa web (90 s de tope) y, si SnapYT
+  retira el formulario, las opciones vuelven a bajar sin audio como antes.
+* Se soportan **TikTok** y **YouTube**. Las rutas
+  `/download/{facebook,instagram,twitter,threads}` y `/transcript/*` existen en
+  la navegación pero muestran «Próximamente»: no hay ninguna fuente comprobada
+  para ellas y no se inventan endpoints.
 * No hay base de datos, usuarios ni cuentas.
 * No se puede comprobar que el archivo exista realmente: se confía en el
   historial, con el botón de borrarlo como escape.
@@ -765,8 +664,10 @@ en DevTools si realmente se llama, con qué método, payload y respuesta.
 3. Lote por perfil + reanudación            ✓
 4. Paginación por cursor + historial        ✓
 5. Destino por perfil + carpeta elegida     ✓
-6. Portada + rutas /download/* y /transcript/*  ✓ (estructura; sólo TikTok activo)
-7. Otras plataformas (YouTube, FB, IG…)     ·
+6. Portada + rutas /download/* y /transcript/*  ✓ (TikTok y YouTube activos)
+7. Otras plataformas (FB, IG, X…)           ·
+   YouTube: vídeo suelto ✓ · calidades altas con audio ✓ · listas ✓
+   faltan canales y transcripción
 8. Transcripción                            · (sin fuente comprobada)
 9. Proveedor reutilizable en Laravel        ·
 ```

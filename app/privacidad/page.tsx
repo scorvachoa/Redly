@@ -75,16 +75,18 @@ export default function PrivacyPage() {
         <h2>URLs y tokens</h2>
         <p>
           Cuando pegas una URL, el servidor la usa para pedir el archivo y te devuelve el
-          stream. Las direcciones temporales del CDN caducan en aproximadamente una hora y{" "}
-          <b>no se escriben en ningún sitio</b>: ni en el navegador ni en el servidor.
+          stream. Las direcciones temporales del CDN caducan en poco tiempo (del orden
+          de una hora, según el origen) y <b>no se escriben en ningún sitio</b>: ni en
+          el navegador ni en el servidor.
         </p>
 
         <h2>Qué ve el servidor</h2>
         <p>
-          El servidor hace de proxy: tu navegador nunca habla directamente con TikTok ni
-          con los servicios de descarga. Esto evita exponer esas peticiones a tu conexión,
-          pero significa que <b>la URL que pegas sí pasa por el servidor</b> mientras se
-          procesa. No se registra en un almacén persistente.
+          El servidor hace de proxy: tu navegador nunca habla directamente con la
+          red social ni con los servicios de descarga. Esto evita exponer esas
+          peticiones a tu conexión, pero significa que <b>la URL que pegas sí pasa
+          por el servidor</b> mientras se procesa. No se registra en un almacén
+          persistente.
         </p>
 
         <h2>Servicios de terceros</h2>

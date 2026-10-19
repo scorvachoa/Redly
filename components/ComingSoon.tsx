@@ -10,8 +10,8 @@ import type { Platform, PlatformKind } from "@/lib/platforms";
  *
  * No se muestra ningún formulario de descarga ni transcripción porque **no hay
  * un origen comprobado** para esa plataforma: no se inventan endpoints, y sólo
- * TikTok está verificado empíricamente. Decir «próximamente» es preferible a
- * mostrar un botón que no puede funcionar.
+ * TikTok y YouTube están verificados empíricamente. Decir «próximamente» es
+ * preferible a mostrar un botón que no puede funcionar.
  */
 export default function ComingSoon({
   platform,
@@ -65,14 +65,16 @@ export default function ComingSoon({
             <>
               <h2 className="soon__title">La descarga de {platform.name} aún no está</h2>
               <p className="soon__text">
-                Red.ly funciona con orígenes verificados uno a uno. Hoy sólo está
-                comprobado <b>TikTok</b>; para {platform.name} no existe ningún
-                servicio configurado, y no se muestra un botón que no podría
-                funcionar.
+                Red.ly funciona con orígenes verificados uno a uno. Hoy sólo están
+                comprobados <b>TikTok</b> y <b>YouTube</b>; para {platform.name} no
+                existe ningún servicio configurado, y no se muestra un botón que no
+                podría funcionar.
               </p>
               <p className="soon__text">
-                El descargador de TikTok sí está completo: un vídeo suelto, un
-                perfil entero, reanudación y carpeta por perfil.
+                Los descargadores disponibles sí están completos: en TikTok, un
+                vídeo suelto o un perfil entero con reanudación y carpeta por
+                perfil; en YouTube, vídeos sueltos, Shorts y listas de
+                reproducción.
               </p>
             </>
           )}

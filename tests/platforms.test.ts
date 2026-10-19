@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 import { PLATFORMS, getPlatform, isReady } from "@/lib/platforms";
 
 describe("registro de plataformas", () => {
-  it("sólo TikTok está disponible para descarga", () => {
+  it("sólo TikTok y YouTube están disponibles para descarga", () => {
     const ready = PLATFORMS.filter((platform) => platform.ready);
 
-    expect(ready).toHaveLength(1);
-    expect(ready[0].slug).toBe("tiktok");
+    expect(ready.map((platform) => platform.slug)).toEqual(["tiktok", "youtube"]);
+  });
+
+  it("TikTok y YouTube tienen listado por perfil/lista", () => {
+    // TikTok: perfiles de usuario. YouTube: listas de reproducción.
+    const profiles = PLATFORMS.filter((platform) => platform.profilesReady);
+
+    expect(profiles.map((platform) => platform.slug)).toEqual(["tiktok", "youtube"]);
   });
 
   it("ninguna plataforma tiene transcripción implementada", () => {
@@ -45,7 +51,8 @@ describe("isReady", () => {
 
     expect(isReady(tiktok, "download")).toBe(true);
     expect(isReady(tiktok, "transcript")).toBe(false);
-    expect(isReady(youtube, "download")).toBe(false);
+    expect(isReady(youtube, "download")).toBe(true);
     expect(isReady(youtube, "transcript")).toBe(false);
+    expect(isReady(getPlatform("facebook")!, "download")).toBe(false);
   });
 });

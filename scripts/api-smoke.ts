@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 
 import { GET as downloadGET } from "../app/api/download/route";
+import { GET as mergeGET } from "../app/api/merge/route";
 import { POST as profilePOST } from "../app/api/profile/route";
 import { POST as searchPOST } from "../app/api/search/route";
 
@@ -33,6 +34,12 @@ function assert(condition: unknown, message: string): asserts condition {
 
 const VIDEO_URL = "https://www.tiktok.com/@scout2015/video/6718335390845095173";
 const PROFILE_URL = "https://www.tiktok.com/@scout2015";
+const YOUTUBE_VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+const YOUTUBE_CHANNEL = "https://www.youtube.com/@dazegreen";
+const YOUTUBE_PLAYLIST_BAD = "https://www.youtube.com/playlist?list=PL1234567890";
+// Lista pública corta (3 vídeos) usada para verificar el listado real.
+const YOUTUBE_PLAYLIST =
+  "https://www.youtube.com/playlist?list=PLo6SgbXOmkypx2OnccNBHzj7V4wFZ600e";
 
 async function main(): Promise<void> {
   // 1. POST /api/search con un vídeo real ---------------------------------
@@ -161,6 +168,132 @@ async function main(): Promise<void> {
     new Request("http://localhost/api/download?url=" + encodeURIComponent("http://evil.example.com/x")),
   );
   assert(proxyAttack.status === 400, "rechaza un host fuera de la lista blanca (400)");
+
+  // 7. YouTube: vídeo suelto ------------------------------------------------
+  console.log("\n[7] POST /api/search (vídeo de YouTube real)");
+  const ytResponse = await searchPOST(jsonRequest("/api/search", { url: YOUTUBE_VIDEO }));
+  const ytBody = (await ytResponse.json()) as {
+    ok?: boolean;
+    error?: string;
+    result?: {
+      title?: string;
+      videoId?: string;
+      downloads?: Array<{ quality?: string; kind?: string; format?: string; url: string }>;
+    };
+  };
+  // Fuente única de YouTube: SnapYT (nonce → preview → proxy de descarga).
+  if (!ytBody.ok) console.log(`  ↳ ${ytBody.error ?? "(sin mensaje)"}`);
+  assert(ytResponse.status === 200, `HTTP 200 (recibido ${ytResponse.status})`);
+  assert(ytBody.ok === true, `respuesta ok=true (${ytBody.error ?? "sin error"})`);
+  assert(Boolean(ytBody.result?.title), `título: ${ytBody.result?.title?.slice(0, 40)}`);
+
+  const ytDownloads = ytBody.result?.downloads ?? [];
+  assert(ytDownloads.length >= 1, `${ytDownloads.length} opciones de descarga`);
+
+  const resolutionOf = (quality?: string): number => {
+    const match = /(\d{3,4})p/.exec(quality ?? "");
+    return match ? Number(match[1]) : 0;
+  };
+  const ytVideos = ytDownloads.filter((option) => option.kind === "video");
+  let descending = true;
+  for (let i = 1; i < ytVideos.length; i += 1) {
+    if (resolutionOf(ytVideos[i - 1]?.quality) < resolutionOf(ytVideos[i]?.quality)) {
+      descending = false;
+    }
+  }
+  assert(
+    ytVideos.length < 2 || descending,
+    `opciones de vídeo ordenadas: ${ytVideos.map((option) => option.quality).join(", ")}`,
+  );
+
+  // La opción de máxima calidad es `video-only` en SnapYT: su URL debe ser la
+  // ruta de combinación de Red.ly, no un enlace directo.
+  const firstYt = ytDownloads[0];
+  assert(
+    Boolean(firstYt && firstYt.url.startsWith("/api/merge?")),
+    `la primera opción combina vídeo+audio (${firstYt?.url.slice(0, 40)}…)`,
+  );
+
+  // Fase 1: SnapYT une las pistas en su servidor y devuelve la URL temporal.
+  const mergeResponse = await mergeGET(new Request(`http://localhost${firstYt!.url}`));
+  const mergeBody = (await mergeResponse.json()) as { ok?: boolean; error?: string; url?: string };
+  assert(
+    mergeResponse.status === 200,
+    `merge HTTP 200 (recibido ${mergeResponse.status}: ${mergeBody.error ?? "ok"})`,
+  );
+  assert(mergeBody.ok === true && Boolean(mergeBody.url), "combinación lista: URL temporal");
+
+  // Fase 2: descarga normal del archivo ya con audio.
+  const ytDownloadResponse = await downloadGET(
+    new Request(
+      `http://localhost/api/download?url=${encodeURIComponent(mergeBody.url ?? "")}&name=smoke-yt.mp4`,
+    ),
+  );
+  assert(
+    ytDownloadResponse.status === 200,
+    `stream de YouTube HTTP 200 (recibido ${ytDownloadResponse.status})`,
+  );
+  const ytReader = ytDownloadResponse.body?.getReader();
+  let ytReceived = 0;
+  if (ytReader) {
+    for (;;) {
+      const { value, done } = await ytReader.read();
+      if (done) break;
+      ytReceived += value?.length ?? 0;
+      if (ytReceived > 64 * 1024) break;
+    }
+    await ytReader.cancel();
+  }
+  assert(ytReceived > 0, `bytes del archivo combinado: ${ytReceived.toLocaleString()}`);
+
+  // 8. YouTube: validaciones de canales y búsquedas --------------------------
+  console.log("\n[8] YouTube: validaciones de canales y búsquedas");
+  const ytChannel = await searchPOST(jsonRequest("/api/search", { url: YOUTUBE_CHANNEL }));
+  assert(ytChannel.status === 400, "rechaza un canal en /search (400)");
+
+  // Los canales se clasifican como perfil, pero la fuente los rechaza (502):
+  // el listado de canales de YouTube no se ofrece todavía.
+  const ytChannelProfile = await profilePOST(jsonRequest("/api/profile", { url: YOUTUBE_CHANNEL }));
+  assert(ytChannelProfile.status === 502, "/api/profile de un canal → 502 (rechazado)");
+
+  const ytPlaylistSearch = await searchPOST(jsonRequest("/api/search", { url: YOUTUBE_PLAYLIST_BAD }));
+  assert(ytPlaylistSearch.status === 400, "rechaza una lista de reproducción en /search (400)");
+
+  // 9. YouTube: lista de reproducción real (vía YTMP3.gg) ----------------
+  console.log("\n[9] POST /api/profile (lista de YouTube real)");
+  const ytPlaylistResponse = await profilePOST(
+    jsonRequest("/api/profile", { url: YOUTUBE_PLAYLIST, max: 3 }),
+  );
+  const ytPlaylistBody = (await ytPlaylistResponse.json()) as {
+    ok?: boolean;
+    error?: string;
+    count?: number;
+    meta?: { title?: string | null; channel?: string | null; total?: number | null } | null;
+    items?: Array<{ id: string; title?: string; url: string; postUrl?: string }>;
+  };
+  if (!ytPlaylistBody.ok) console.log(`  ↳ ${ytPlaylistBody.error ?? "(sin mensaje)"}`);
+  assert(
+    ytPlaylistResponse.status === 200,
+    `HTTP 200 (recibido ${ytPlaylistResponse.status}: ${ytPlaylistBody.error ?? "ok"})`,
+  );
+  assert(ytPlaylistBody.ok === true, "respuesta ok=true");
+  assert((ytPlaylistBody.items?.length ?? 0) >= 1, `${ytPlaylistBody.count} vídeos listados`);
+  // El título viene del og:title de la propia página de YouTube (best-effort).
+  assert(
+    Boolean(ytPlaylistBody.meta?.title),
+    `meta con el título de la lista (${ytPlaylistBody.meta?.title?.slice(0, 40)})`,
+  );
+  // El canal se deduce del primer vídeo listado (YTMP3 no expone el autor de la lista).
+  assert(
+    Boolean(ytPlaylistBody.meta?.channel),
+    `meta con el canal (${ytPlaylistBody.meta?.channel?.slice(0, 40)})`,
+  );
+  const ytPlFirst = ytPlaylistBody.items?.[0];
+  assert(Boolean(ytPlFirst?.id && ytPlFirst?.title), `primer vídeo: ${ytPlFirst?.title?.slice(0, 30)}`);
+  assert(
+    Boolean(ytPlFirst?.postUrl?.startsWith("https://www.youtube.com/watch")),
+    `postUrl apunta al watch URL (${ytPlFirst?.postUrl?.slice(0, 40)}…)`,
+  );
 
   console.log("\n✓ Smoke test de la API superado.");
 }

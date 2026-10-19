@@ -45,7 +45,7 @@ const FEATURES = [
   {
     icon: ShieldHalved,
     title: "Sólo contenido público",
-    text: "No se eluden CAPTCHA ni controles de acceso, y el navegador nunca habla con TikTok.",
+    text: "No se eluden CAPTCHA ni controles de acceso, y el navegador nunca habla directamente con la red social.",
   },
   {
     icon: Lock,
@@ -103,7 +103,7 @@ export default function WelcomePage() {
           <div className="hero__glow" aria-hidden="true" />
           <div className="hero__badge">
             <span className="hero__badge-dot" />
-            TikTok disponible · resto pronto
+            TikTok y YouTube disponibles · resto pronto
           </div>
           <h1 className="hero__title">
             Descarga y transcribe
@@ -126,7 +126,8 @@ export default function WelcomePage() {
           </div>
           <div className="hero__stats">
             <span>
-              <b>{available.length}</b> plataforma activa
+              <b>{available.length}</b>{" "}
+              {available.length === 1 ? "plataforma activa" : "plataformas activas"}
             </span>
             <span className="hero__stats-sep" />
             <span>
@@ -145,7 +146,8 @@ export default function WelcomePage() {
               <div className="section-title">Descargar</div>
               <p className="landing-section__lead">
                 Pega la URL de un vídeo o de un perfil completo. En TikTok puedes
-                bajar un perfil entero con reanudación y carpeta por perfil.
+                bajar un perfil entero con reanudación y carpeta por perfil; en
+                YouTube, vídeos sueltos y Shorts.
               </p>
             </div>
             <span className="pill pill--ready">
@@ -292,8 +294,8 @@ export default function WelcomePage() {
 
         <div className="hint">
           El servidor hace de proxy: el navegador nunca habla directamente con
-          TikTok ni con los servicios de descarga. Las URLs temporales caducan en
-          ~1 hora y nunca se guardan.
+          la red social ni con los servicios de descarga. Las URLs temporales
+          caducan en poco tiempo y nunca se guardan.
         </div>
       </main>
 

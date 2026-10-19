@@ -7,7 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Red.ly — Descarga y transcripción de vídeos públicos",
   description:
-    "Cliente web en TypeScript para descargar y transcribir vídeos públicos. TikTok disponible; el resto de plataformas, próximamente.",
+    "Cliente web en TypeScript para descargar y transcribir vídeos públicos. TikTok y YouTube disponibles; el resto de plataformas, próximamente.",
   applicationName: "Red.ly",
   appleWebApp: {
     capable: true,

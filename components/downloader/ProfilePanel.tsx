@@ -9,7 +9,9 @@
  */
 
 import { Download } from "@/components/icons";
+import type { BatchQuality } from "@/lib/models";
 import type { ProfileVideo } from "@/lib/models";
+import type { ProfileMeta } from "@/lib/savetik";
 
 import DestinationRow from "./DestinationRow";
 import type { Destination } from "./useDestination";
@@ -20,8 +22,16 @@ export interface ProfileStats {
   pages: number;
 }
 
+/** Una entrada del selector de calidad del lote. */
+export interface QualityOption {
+  value: BatchQuality;
+  label: string;
+}
+
 export interface ProfilePanelProps {
   items: ProfileVideo[];
+  /** Título/canal/total del listado, si la fuente los aporta (YouTube). */
+  meta?: ProfileMeta | null;
   stats: ProfileStats;
   wanted: number;
   doneIds: ReadonlySet<string>;
@@ -30,6 +40,11 @@ export interface ProfilePanelProps {
   historyCount: number;
   historyAvailable: boolean;
   destination: Destination;
+  /** Calidad con la que se baja el lote. */
+  qualityMode: BatchQuality;
+  /** Opciones del selector; si hay menos de dos no se pinta el selector. */
+  qualityOptions: readonly QualityOption[];
+  onQualityChange: (mode: BatchQuality) => void;
   onWantedChange: (value: number) => void;
   onToggleChecked: (id: string) => void;
   onSelectAll: () => void;
@@ -42,6 +57,7 @@ export interface ProfilePanelProps {
 
 export default function ProfilePanel({
   items,
+  meta,
   stats,
   wanted,
   doneIds,
@@ -50,6 +66,9 @@ export default function ProfilePanel({
   historyCount,
   historyAvailable,
   destination,
+  qualityMode,
+  qualityOptions,
+  onQualityChange,
   onWantedChange,
   onToggleChecked,
   onSelectAll,
@@ -66,16 +85,24 @@ export default function ProfilePanel({
     0,
   );
   const allSelected = selectableCount > 0 && checkedIds.size >= selectableCount;
+  // Con meta se titula con el nombre real del listado; sin ella (TikTok) se
+  // conserva el texto genérico de siempre.
+  const title = meta?.title ?? `Listado con ${items.length} vídeo(s)`;
+  const total = meta?.total ?? items.length;
 
   return (
     <>
       <div className="card result">
         <div className="result__thumb">
-          {items[0]?.thumbnail ? <img src={items[0].thumbnail} alt="" /> : "Perfil"}
+          {items[0]?.thumbnail ? <img src={items[0].thumbnail} alt="" /> : "Listado"}
         </div>
         <div className="result__body">
-          <h1 className="result__title">Perfil con {items.length} vídeo(s)</h1>
+          <h1 className="result__title">{title}</h1>
           <div className="result__meta">
+            <span>
+              {meta?.channel ? `${meta.channel} · ` : ""}
+              {total} vídeo(s)
+            </span>
             <span>Se descargan uno a uno, con pausa entre vídeos.</span>
             <span>Lo ya bajado queda marcado y no se vuelve a descargar.</span>
           </div>
@@ -154,7 +181,7 @@ export default function ProfilePanel({
       </div>
 
       <div className="list-head">
-        <div className="section-title">Vídeos del perfil</div>
+        <div className="section-title">Vídeos del listado</div>
 
         <div className="list-head__actions">
           <button
@@ -211,13 +238,32 @@ export default function ProfilePanel({
 
       <div className="card download-bar">
         <div className="actions">
+          {qualityOptions.length > 1 && (
+            <label className="quality" htmlFor="batch-quality">
+              <span className="quality__label">Calidad</span>
+              <select
+                id="batch-quality"
+                className="select"
+                value={qualityMode}
+                onChange={(event) => onQualityChange(event.target.value as BatchQuality)}
+                disabled={busy}
+              >
+                {qualityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="button"
             className="btn btn--primary"
             onClick={onDownloadAll}
             disabled={busy || checkedIds.size === 0}
           >
-            <Download size={15} aria-hidden="true" /> Descargar {checkedIds.size} vídeo(s)
+            <Download size={15} aria-hidden="true" /> Descargar {checkedIds.size}{" "}
+            {qualityMode === "audio" ? "audio(s)" : "vídeo(s)"}
           </button>
           <button type="button" className="btn btn--ghost" onClick={onReset} disabled={busy}>
             Limpiar

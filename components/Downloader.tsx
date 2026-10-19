@@ -35,11 +35,19 @@ import {
   TriangleExclamation,
   Video,
 } from "@/components/icons";
-import { downloadWithProgress, isProfileLike, progressLabel } from "@/lib/download-stream";
+import { downloadWithProgress, progressLabel } from "@/lib/download-stream";
 import { joinDestination } from "@/lib/fsaccess";
-import { bestQualityOption, type DownloadOption, type ProfileVideo, type TikTokResult } from "@/lib/models";
-import type { Platform } from "@/lib/platforms";
-import { inputToTikTokUrl, profileFolderName } from "@/lib/urls";
+import {
+  batchOption,
+  type BatchQuality,
+  type DownloadOption,
+  type ProfileVideo,
+  type TikTokResult,
+} from "@/lib/models";
+import { getPlatform, type Platform } from "@/lib/platforms";
+import type { ProfileMeta } from "@/lib/savetik";
+import { classifyInput } from "@/lib/urlrules";
+import { profileFolderName } from "@/lib/urls";
 
 type Mode = "idle" | "video" | "profile";
 
@@ -48,7 +56,10 @@ interface Status {
   text: string;
 }
 
-const DEFAULT_STATUS: Status = { kind: "info", text: "Pega una URL de TikTok para empezar" };
+/** Mensaje inicial, en función de la plataforma de la página. */
+function defaultStatus(platform: Platform): Status {
+  return { kind: "info", text: `Pega una URL de ${platform.name} para empezar` };
+}
 
 /** Vídeos pendientes que se buscan por defecto al analizar un perfil. */
 const DEFAULT_PROFILE_WANTED = 100;
@@ -63,6 +74,7 @@ interface ProfilePageResponse {
   ok?: boolean;
   error?: string;
   items?: ProfileVideo[];
+  meta?: ProfileMeta | null;
   next_cursor?: string | number | null;
 }
 
@@ -70,7 +82,10 @@ interface ProfilePageResponse {
  * Nombre de archivo de una opción del resultado.
  *
  * En un carrusel se numeran las fotos (`Redly_<id>_3.jpeg`): sin el índice,
- * todas acabarían con el mismo nombre y se pisarían en el destino.
+ * todas acabarían con el mismo nombre y se pisarían en el destino. El id se
+ * usa sólo si es un identificador razonable: los de TikTok son numéricos y
+ * los de YouTube alfanuméricos (`dQw4w9WgXcQ`); cualquier otra cosa cae a
+ * «video» para no generar nombres raros.
  */
 function optionFilename(
   videoId: string | null | undefined,
@@ -78,28 +93,63 @@ function optionFilename(
   photoIndex: number,
   photoCount: number,
 ): string {
-  const id = videoId && /^\d+$/.test(videoId) ? videoId : "video";
+  const usable = videoId && /^[A-Za-z0-9_-]{6,}$/.test(videoId);
+  const id = usable ? videoId : "video";
   const isImage = option.kind === "image";
   const suffix = isImage && photoCount > 1 ? `_${photoIndex + 1}` : "";
   const extension = option.format ?? (isImage ? "jpeg" : "mp4");
   return `Redly_${id}${suffix}.${extension}`;
 }
 
-/** Índice de la primera opción que no sea imagen (las calidades de vídeo/audio). */
-function firstMediaIndex(result: TikTokResult): number {
-  const index = result.downloads.findIndex((option) => option.kind !== "image");
-  return index === -1 ? 0 : index;
+/**
+ * Índice de la opción preseleccionada al mostrar un resultado.
+ *
+ * La preselección es la **recomendada**: la primera pista de medios que ya
+ * trae audio por sí misma (la progresiva de YouTube, el MP4 estándar de
+ * TikTok). Si ninguna lo declara, se marca la primera opción de medios.
+ */
+function preferredMediaIndex(result: TikTokResult): number {
+  const withAudio = result.downloads.findIndex(
+    (option) => option.kind !== "image" && option.hasAudio === true,
+  );
+  if (withAudio !== -1) return withAudio;
+  const first = result.downloads.findIndex((option) => option.kind !== "image");
+  return first === -1 ? 0 : first;
 }
 
 /**
- * Pide al servidor las opciones del post y devuelve la de máxima calidad.
+ * Lee la respuesta JSON de la API.
  *
- * El listado de perfil sólo entrega el MP4 estándar; el HD sólo aparece al
- * analizar el post. Si la petición falla, está limitada por tasa o no hay HD,
- * se devuelve `null` y se conserva la URL del listado: mejorar la calidad nunca
- * debe impedir que el vídeo se descargue.
+ * Si el cuerpo viene vacío o cortado (timeout de la función, proxy, red
+ * caída), `response.json()` lanza un `SyntaxError` crudo
+ * («Unexpected end of JSON input») que se escaparía al estado de la UI; aquí
+ * se convierte en un mensaje claro con el código HTTP.
  */
-async function fetchBestQualityUrl(postUrl: string): Promise<string | null> {
+async function readJson<T>(response: Response): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error(`El servidor no respondió con JSON (HTTP ${response.status}).`);
+  }
+}
+
+/**
+ * Pide al servidor las opciones del post y elige la de calidad indicada.
+ *
+ * El listado sólo entrega el MP4 estándar; las calidades reales sólo aparecen
+ * al analizar el post. Si la petición falla o está limitada por tasa se
+ * devuelve `null` y se conserva la URL del listado: mejorar la calidad nunca
+ * debe impedir que el vídeo se descargue.
+ *
+ * La selección vive en `batchOption` (`lib/models.ts`): en `recommended` sólo
+ * se consideran opciones directas; en `max` también las que SnapYT sirve como
+ * combinación (`/api/merge?…`), marcadas con `isMerge` para que el lote ejecute
+ * esa fase antes de streamar; en `audio` sólo la pista de sonido.
+ */
+async function fetchQualityUrl(
+  postUrl: string,
+  mode: BatchQuality,
+): Promise<{ url: string; isMerge: boolean; format?: string | null } | null> {
   try {
     const response = await fetch("/api/search", {
       method: "POST",
@@ -107,28 +157,37 @@ async function fetchBestQualityUrl(postUrl: string): Promise<string | null> {
       body: JSON.stringify({ url: postUrl }),
     });
     if (!response.ok) return null;
-    const data = (await response.json()) as { ok?: boolean; result?: TikTokResult };
+    const data = await readJson<{ ok?: boolean; result?: TikTokResult }>(response);
     if (!data.ok || !data.result) return null;
-    return bestQualityOption(data.result)?.url ?? null;
+    const option = batchOption(data.result, mode);
+    return option
+      ? { url: option.url, isMerge: option.url.startsWith("/"), format: option.format }
+      : null;
   } catch {
     return null;
   }
 }
 
 export default function Downloader({ platform }: { platform: Platform }) {
+  // En YouTube el modo «perfil» es el listado de una lista de reproducción
+  // (no un @usuario): la copia de la UI se ajusta al sustantivo correcto.
+  const isPlaylistPlatform = platform.slug === "youtube";
   const [url, setUrl] = useState("");
   const [mode, setMode] = useState<Mode>("idle");
-  const [status, setStatus] = useState<Status>(DEFAULT_STATUS);
+  const [status, setStatus] = useState<Status>(() => defaultStatus(platform));
   const [busy, setBusy] = useState(false);
 
   const [result, setResult] = useState<TikTokResult | null>(null);
   const [selected, setSelected] = useState(0);
 
   const [items, setItems] = useState<ProfileVideo[]>([]);
+  const [profileMeta, setProfileMeta] = useState<ProfileMeta | null>(null);
   const [profileWanted, setProfileWanted] = useState<number>(DEFAULT_PROFILE_WANTED);
   const [profileStats, setProfileStats] = useState<ProfileStats>({ pending: 0, done: 0, pages: 0 });
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  /** Calidad con la que baja el lote; sólo tiene efecto en listas de YouTube. */
+  const [qualityMode, setQualityMode] = useState<BatchQuality>("recommended");
 
   const [progress, setProgress] = useState<ProgressState>(IDLE_PROGRESS);
 
@@ -145,6 +204,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
   const reset = useCallback(() => {
     setResult(null);
     setItems([]);
+    setProfileMeta(null);
     setSelected(0);
     setDoneIds(new Set());
     setCheckedIds(new Set());
@@ -153,15 +213,21 @@ export default function Downloader({ platform }: { platform: Platform }) {
   }, []);
 
   /**
-   * «Limpiar» del modo vídeo. `reset` sólo borra los datos, así que además se
-   * vuelve a `idle`: si no, el panel dejaría de pintarse (porque `result` es
-   * nulo) pero tampoco se mostrarían las tarjetas de modo.
+   * «Limpiar» de ambos paneles. `reset` sólo borra los datos del resultado,
+   * así que además se vuelve a `idle`, se vacía la URL del input y se
+   * restaura el contador de vídeos a buscar: al terminar debe quedar la misma
+   * pantalla que al entrar por primera vez (sin nada residual del análisis).
+   *
+   * No se toca la carpeta elegida (`useDestination`): es una preferencia del
+   * usuario, no datos del resultado.
    */
-  const clearResult = useCallback(() => {
+  const clearAll = useCallback(() => {
     reset();
     setMode("idle");
-    setStatus(DEFAULT_STATUS);
-  }, [reset]);
+    setUrl("");
+    setProfileWanted(DEFAULT_PROFILE_WANTED);
+    setStatus(defaultStatus(platform));
+  }, [reset, platform]);
 
   const clearHistory = useCallback(() => {
     history.clear();
@@ -197,7 +263,8 @@ export default function Downloader({ platform }: { platform: Platform }) {
 
   /**
    * Pagina `/api/profile` hasta reunir suficientes pendientes.
-   * Devuelve el listado, el reparto pendiente/ya bajado y las páginas usadas.
+   * Devuelve el listado, el reparto pendiente/ya bajado, las páginas usadas
+   * y los metadatos del listado (título/canal/total, si los aporta la fuente).
    */
   const listProfile = useCallback(
     async (target: string, wanted: number) => {
@@ -207,21 +274,22 @@ export default function Downloader({ platform }: { platform: Platform }) {
       let page = 1;
       let pages = 0;
       let doneFound = 0;
+      let meta: ProfileMeta | null = null;
 
       for (;;) {
         setStatus({
           kind: "info",
-          text: `Listando perfil… página ${page} · ${collected.length} vídeo(s)`,
+          text: `Listando… página ${page} · ${collected.length} vídeo(s)`,
         });
 
-        const response = await fetch("/api/profile", {
+        const response: Response = await fetch("/api/profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: target, cursor, page }),
         });
-        const data = (await response.json()) as ProfilePageResponse;
+        const data: ProfilePageResponse = await readJson<ProfilePageResponse>(response);
         if (!response.ok || !data.ok) {
-          throw new Error(data.error ?? "No se pudo listar el perfil.");
+          throw new Error(data.error ?? "No se pudo hacer el listado.");
         }
 
         for (const item of data.items ?? []) {
@@ -230,6 +298,9 @@ export default function Downloader({ platform }: { platform: Platform }) {
           collected.push(item);
           if (history.isDone(item.id)) doneFound += 1;
         }
+        // Los metadatos del listado viajan con la primera página; si una
+        // fuente no los aporta, se queda `null` y la UI usa texto genérico.
+        if (!meta && data.meta) meta = data.meta;
 
         pages += 1;
         const pendingCount = collected.length - doneFound;
@@ -250,16 +321,46 @@ export default function Downloader({ platform }: { platform: Platform }) {
 
       const done = collected.filter((item) => history.isDone(item.id));
       const pending = collected.filter((item) => !history.isDone(item.id));
-      return { collected, done, pending, pages };
+      return { collected, done, pending, pages, meta };
     },
     [history],
   );
 
   const analyze = useCallback(async () => {
-    const target = inputToTikTokUrl(url);
-    if (!target) {
-      setStatus({ kind: "error", text: "Introduce una URL de TikTok." });
+    const classified = classifyInput(url);
+    if (!classified) {
+      setStatus({ kind: "error", text: `Introduce una URL de ${platform.name}.` });
       inputRef.current?.focus();
+      return;
+    }
+    // Cada página descarga sólo su plataforma: detectar por host basta para
+    // enrutar la API, pero aquí se compara con la de la página para no
+    // procesar una URL ajena con el flujo equivocado.
+    if (classified.slug !== platform.slug) {
+      const other = getPlatform(classified.slug)?.name ?? "otra plataforma";
+      setStatus({
+        kind: "error",
+        text: `Esa URL es de ${other}. Introduce una URL de ${platform.name}.`,
+      });
+      inputRef.current?.focus();
+      return;
+    }
+
+    // Los canales/listas se descartan aquí para no mandarlos a la API: la
+    // respuesta sería un error igual, pero llega antes y con mejor mensaje.
+    const classifiedPlatform = getPlatform(classified.slug);
+    if (classified.kind === "profile" && classifiedPlatform?.profilesReady !== true) {
+      setStatus({
+        kind: "error",
+        text: `Los canales de ${classifiedPlatform?.name ?? "esa plataforma"} aún no están disponibles.`,
+      });
+      return;
+    }
+    if (classified.kind === "unsupported") {
+      setStatus({
+        kind: "error",
+        text: `Esa URL de ${classifiedPlatform?.name ?? "esa plataforma"} no corresponde a un vídeo concreto.`,
+      });
       return;
     }
 
@@ -268,41 +369,42 @@ export default function Downloader({ platform }: { platform: Platform }) {
     setStatus({ kind: "info", text: "Analizando…" });
 
     try {
-      if (isProfileLike(target)) {
+      if (classified.kind === "profile") {
         const wanted =
           Number.isFinite(profileWanted) && profileWanted > 0
             ? Math.floor(profileWanted)
             : DEFAULT_PROFILE_WANTED;
 
-        const { collected, done, pending, pages } = await listProfile(target, wanted);
+        const { collected, done, pending, pages, meta } = await listProfile(classified.url, wanted);
 
         setItems(collected);
+        setProfileMeta(meta);
         setDoneIds(new Set(done.map((item) => item.id)));
         setCheckedIds(new Set(pending.map((item) => item.id)));
         setProfileStats({ pending: pending.length, done: done.length, pages });
         setMode("profile");
         setStatus({
           kind: "ok",
-          text: `Perfil listo · ${pending.length} pendiente(s) · ${done.length} ya descargado(s)`,
+          text: `Listado listo · ${pending.length} pendiente(s) · ${done.length} ya descargado(s)`,
         });
       } else {
         const response = await fetch("/api/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: target }),
+          body: JSON.stringify({ url: classified.url }),
         });
-        const data = (await response.json()) as {
+        const data = await readJson<{
           ok?: boolean;
           error?: string;
           result?: TikTokResult;
-        };
+        }>(response);
         if (!response.ok || !data.ok || !data.result) {
           throw new Error(data.error ?? "No se pudo analizar el vídeo.");
         }
 
         setResult(data.result);
         setMode("video");
-        setSelected(firstMediaIndex(data.result));
+        setSelected(preferredMediaIndex(data.result));
         setStatus({ kind: "ok", text: `Listo · ${data.result.downloads.length} opción(es) encontradas` });
       }
     } catch (error) {
@@ -311,7 +413,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
     } finally {
       setBusy(false);
     }
-  }, [url, reset, profileWanted, listProfile]);
+  }, [url, reset, profileWanted, listProfile, platform]);
 
   // --- Descargas --------------------------------------------------------
 
@@ -327,12 +429,51 @@ export default function Downloader({ platform }: { platform: Platform }) {
         .filter((item) => item.kind === "image").length;
       const name = optionFilename(result.videoId, option, photoIndex, images.length);
 
+      // Una URL relativa (`/api/merge?…`) es una opción de YouTube que el
+      // servidor debe combinar (vídeo + audio) antes de poder descargarla.
+      const isMerge = option.url.startsWith("/");
+
       setBusy(true);
-      setStatus({ kind: "info", text: option.kind === "image" ? "Descargando foto…" : "Descargando…" });
-      setProgress({ done: 0, total: null, label: "Conectando con el CDN…", indeterminate: true });
+      setStatus({
+        kind: "info",
+        text: isMerge
+          ? "Combinando vídeo y audio en el servidor…"
+          : option.kind === "image"
+            ? "Descargando foto…"
+            : "Descargando…",
+      });
+      setProgress({
+        done: 0,
+        total: null,
+        label: isMerge ? "Preparando la mezcla (puede tardar)…" : "Conectando con el CDN…",
+        indeterminate: true,
+      });
 
       try {
-        const params = new URLSearchParams({ url: option.url, name });
+        let sourceUrl = option.url;
+        if (isMerge) {
+          // Fase 1: SnapYT une las pistas y devuelve la URL temporal del
+          // archivo ya con audio (el progreso real empieza en la fase 2).
+          const prepared = await fetch(option.url);
+          const data = (await prepared.json().catch(() => ({}))) as {
+            ok?: boolean;
+            error?: string;
+            url?: string;
+          };
+          if (!prepared.ok || !data.ok || !data.url) {
+            throw new Error(data.error ?? "No se pudo combinar el vídeo con audio.");
+          }
+          sourceUrl = data.url;
+          setProgress({
+            done: 0,
+            total: null,
+            label: "Descargando el archivo combinado…",
+            indeterminate: true,
+          });
+        }
+
+        // Fase 2 (y flujo normal): stream con progreso vía /api/download.
+        const params = new URLSearchParams({ url: sourceUrl, name });
         const bytes = await downloadWithProgress(
           `/api/download?${params.toString()}`,
           name,
@@ -458,24 +599,67 @@ export default function Downloader({ platform }: { platform: Platform }) {
     let completed = 0;
     let failed = 0;
     let lastError: string | null = null;
+    const mediaWord = qualityMode === "audio" ? "audio" : "vídeo";
 
     for (let index = 0; index < queue.length; index++) {
       const item = queue[index];
-      setStatus({ kind: "info", text: `Descargando vídeo ${index + 1} de ${queue.length}…` });
+      const position = `${index + 1}/${queue.length}`;
+      setStatus({ kind: "info", text: `Descargando ${mediaWord} ${index + 1} de ${queue.length}…` });
       setProgress({
         done: 0,
         total: null,
-        label: `${index + 1}/${queue.length} · ${item.title ?? item.id}`,
+        label: `${position} · ${item.title ?? item.id}`,
         indeterminate: true,
       });
 
-      const name = `Redly_${item.id}.${item.format ?? "mp4"}`;
       try {
-        // El listado sólo trae el MP4 estándar: se busca el HD y, si no lo hay
-        // o falla la consulta, se baja el que ya se tenía.
-        const sourceUrl = item.postUrl
-          ? (await fetchBestQualityUrl(item.postUrl)) ?? item.url
-          : item.url;
+        // El listado sólo trae el MP4 estándar: se resuelve la calidad pedida
+        // (y, si no llega o falla la consulta, se baja el que ya se tenía).
+        const resolved = item.postUrl ? await fetchQualityUrl(item.postUrl, qualityMode) : null;
+
+        // En modo audio no se recurre al MP4 del listado: quien pidió sonido
+        // recibiría un vídeo si la consulta fallara, que es peor que un fallo
+        // contado en el resumen del lote.
+        if (!resolved && qualityMode === "audio") {
+          throw new Error("Sin pista de audio disponible; se omite este vídeo.");
+        }
+
+        const chosen = resolved ?? { url: item.url, isMerge: false, format: item.format };
+
+        // Una URL relativa (`/api/merge?…`) es una opción de YouTube que el
+        // servidor debe combinar (vídeo + audio) antes de poder descargarla.
+        let sourceUrl = chosen.url;
+        if (chosen.isMerge) {
+          setProgress({
+            done: 0,
+            total: null,
+            label: `${position} · Combinando vídeo y audio…`,
+            indeterminate: true,
+          });
+          const prepared = await fetch(chosen.url);
+          const merged = (await prepared.json().catch(() => ({}))) as {
+            ok?: boolean;
+            error?: string;
+            url?: string;
+          };
+          if (!prepared.ok || !merged.ok || !merged.url) {
+            throw new Error(merged.error ?? "No se pudo combinar el vídeo con audio.");
+          }
+          sourceUrl = merged.url;
+          setProgress({
+            done: 0,
+            total: null,
+            label: `${position} · Descargando el archivo combinado…`,
+            indeterminate: true,
+          });
+        }
+
+        // El nombre usa el formato de la opción resuelta (mp4 tras combinar;
+        // mp3/m4a/opus en modo audio).
+        const extension = chosen.isMerge
+          ? "mp4"
+          : (chosen.format ?? (qualityMode === "audio" ? "mp3" : (item.format ?? "mp4")));
+        const name = `Redly_${item.id}.${extension}`;
         const params = new URLSearchParams({ url: sourceUrl, name });
         const bytes = await downloadWithProgress(
           `/api/download?${params.toString()}`,
@@ -536,7 +720,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
           : "Guardados en Descargas",
       indeterminate: false,
     });
-  }, [items, checkedIds, destination, history, destSubdir]);
+  }, [items, checkedIds, qualityMode, destination, history, destSubdir]);
 
   const busyLabel = busy && status.kind === "info" ? status.text : null;
 
@@ -554,8 +738,14 @@ export default function Downloader({ platform }: { platform: Platform }) {
           <div className="tool-head__body">
             <h1 className="tool-head__title">Descargar de {platform.name}</h1>
             <p className="tool-head__lead">
-              Pega la URL de un vídeo o de un perfil público. El servidor hace de proxy: tu
-              navegador nunca habla directamente con {platform.name}.
+              Pega la URL de un vídeo
+              {platform.profilesReady
+                ? isPlaylistPlatform
+                  ? " o la de una lista de reproducción"
+                  : " o de un perfil público"
+                : ""}
+              . El servidor hace de proxy: tu navegador nunca habla directamente con{" "}
+              {platform.name}.
             </p>
           </div>
         </div>
@@ -564,9 +754,11 @@ export default function Downloader({ platform }: { platform: Platform }) {
           <span className="chip">
             <Video size={13} /> Vídeo individual
           </span>
-          <span className="chip">
-            <ListUl size={13} /> Perfil completo en lote
-          </span>
+          {platform.profilesReady && (
+            <span className="chip">
+              <ListUl size={13} /> {isPlaylistPlatform ? "Lista completa en lote" : "Perfil completo en lote"}
+            </span>
+          )}
           <span className="chip">
             <Lock size={13} /> Sin registro
           </span>
@@ -583,7 +775,13 @@ export default function Downloader({ platform }: { platform: Platform }) {
               className="input"
               type="url"
               spellCheck={false}
-              placeholder={`@usuario  ·  o la URL de un vídeo o foto`}
+              placeholder={
+                platform.profilesReady
+                  ? isPlaylistPlatform
+                    ? `la URL de un vídeo o una lista de reproducción`
+                    : `@usuario  ·  o la URL de un vídeo o foto`
+                  : `la URL de un vídeo de ${platform.name}`
+              }
               value={url}
               disabled={busy}
               onChange={(event) => setUrl(event.target.value)}
@@ -630,21 +828,37 @@ export default function Downloader({ platform }: { platform: Platform }) {
                   </span>
                 </span>
               </div>
-              <div className="mode-card">
-                <span className="mode-card__icon" aria-hidden="true">
-                  <ListUl size={15} />
-                </span>
-                <span className="mode-card__body">
-                  <span className="mode-card__title">Un perfil entero</span>
-                  <span className="mode-card__text">
-                    Se pagina el listado y se bajan los pendientes uno a uno, con reanudación y
-                    carpeta propia.
+              {platform.profilesReady && (
+                <div className="mode-card">
+                  <span className="mode-card__icon" aria-hidden="true">
+                    <ListUl size={15} />
                   </span>
-                </span>
-              </div>
+                  <span className="mode-card__body">
+                  <span className="mode-card__title">
+                    {isPlaylistPlatform ? "Una lista completa" : "Un perfil entero"}
+                  </span>
+                  <span className="mode-card__text">
+                    {isPlaylistPlatform
+                      ? "Se lista la reproducción completa y se bajan los vídeos uno a uno, con reanudación y carpeta propia."
+                      : "Se pagina el listado y se bajan los pendientes uno a uno, con reanudación y carpeta propia."}
+                  </span>
+                  </span>
+                </div>
+              )}
             </div>
             <div className="hint">
-              Acepta la URL de un <b>vídeo</b> o la de un <b>perfil</b> (<code>@usuario</code>).
+              {platform.profilesReady ? (
+                <>
+                  Acepta la URL de un <b>vídeo</b> o la de una{" "}
+                  <b>{isPlaylistPlatform ? "lista de reproducción" : "perfil"}</b>
+                  {isPlaylistPlatform ? "" : " (<code>@usuario</code>)"}.
+                </>
+              ) : (
+                <>
+                  Acepta la URL de un <b>vídeo</b> (también Shorts y enlaces{" "}
+                  <code>youtu.be</code>).
+                </>
+              )}{" "}
               Sólo se admite contenido público: no se eluden CAPTCHA ni controles de acceso.
             </div>
           </>
@@ -659,13 +873,14 @@ export default function Downloader({ platform }: { platform: Platform }) {
             onSelect={setSelected}
             onDownloadOption={(index) => void downloadOption(index)}
             onDownloadPhotos={() => void downloadPhotos()}
-            onReset={clearResult}
+            onReset={clearAll}
           />
         )}
 
         {mode === "profile" && (
           <ProfilePanel
             items={items}
+            meta={profileMeta}
             stats={profileStats}
             wanted={profileWanted}
             doneIds={doneIds}
@@ -674,6 +889,20 @@ export default function Downloader({ platform }: { platform: Platform }) {
             historyCount={history.count}
             historyAvailable={history.available}
             destination={destination}
+            // El selector sólo aparece donde hay más de una calidad real: en
+            // YouTube la resolución alta requiere combinación; en TikTok el
+            // listado ya resuelve el HD, así que no hay nada que elegir.
+            qualityMode={qualityMode}
+            qualityOptions={
+              isPlaylistPlatform
+                ? [
+                    { value: "recommended", label: "Recomendada (con audio)" },
+                    { value: "max", label: "Máxima calidad (con combinación)" },
+                    { value: "audio", label: "Solo audio" },
+                  ]
+                : []
+            }
+            onQualityChange={setQualityMode}
             onWantedChange={setProfileWanted}
             onToggleChecked={toggleChecked}
             onSelectAll={selectAllChecked}
@@ -681,7 +910,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
             onReanalyze={() => void analyze()}
             onClearHistory={clearHistory}
             onDownloadAll={() => void downloadAll()}
-            onReset={reset}
+            onReset={clearAll}
           />
         )}
 

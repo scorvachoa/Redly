@@ -135,13 +135,16 @@ function extractDownloads($: cheerio.CheerioAPI): DownloadOption[] {
 
     const name = cleanText(el.text()) || "Download";
     const format = inferFormat(name, url, fallbackFormat);
+    const kind = kindFromFormat(format);
     options.push({
       name,
       url,
       format,
       quality: inferQuality(name),
-      kind: kindFromFormat(format),
+      kind,
       thumbnail,
+      // Los MP4 de TikTok siempre traen el sonido en la misma pista.
+      ...(kind === "video" ? { hasAudio: true } : {}),
     });
   };
 

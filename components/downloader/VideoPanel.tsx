@@ -4,15 +4,23 @@
  * Panel de resultado para un vídeo suelto.
  *
  * Presentacional: recibe el resultado y cuatro callbacks. No tiene estado propio
- * salvo el foco de teclado de las tarjetas de opción, que es puramente visual.
+ * salvo el foco de teclado de las tarjetas de opción y la pestaña
+ * Vídeo/Audio, que son puramente de presentación.
  *
  * Una publicación de fotos de TikTok (carrusel) devuelve una opción por imagen,
  * con miniatura propia. Se pintan como galería con descarga individual y
  * «Descargar todas»; las calidades de vídeo/audio siguen en su lista de siempre.
+ *
+ * Cuando la lista es larga (YouTube trae ~17 vídeos y ~7 audios) las opciones
+ * se parten en dos pestañas; con pocas opciones (TikTok: 2 MP4 + 1 MP3) se
+ * lista todo en una sola columna, sin pestañas. Cada opción de vídeo puede
+ * llevar una etiqueta de audio según el campo `hasAudio` del modelo.
  */
 
+import { useState } from "react";
+
 import { Download } from "@/components/icons";
-import type { TikTokResult } from "@/lib/models";
+import type { DownloadOption, TikTokResult } from "@/lib/models";
 import { optionLabel } from "@/lib/models";
 
 import DestinationRow from "./DestinationRow";
@@ -29,6 +37,23 @@ export interface VideoPanelProps {
   onReset: () => void;
 }
 
+/** Etiqueta de estado de audio de una opción de vídeo, o `null` si no aplica. */
+function audioBadge(option: DownloadOption): { text: string; className: string } | null {
+  // Una URL relativa (`/api/merge?…`) es una opción que el servidor combinará
+  // con una pista de audio antes de entregar el archivo.
+  const mergeable = option.url.startsWith("/");
+  if (option.hasAudio === false) {
+    return mergeable
+      ? { text: "Se combina con audio", className: "badge" }
+      : { text: "Sin audio", className: "badge badge--muted" };
+  }
+  if (option.hasAudio === true) {
+    return { text: "Con audio", className: "badge badge--ok" };
+  }
+  // La fuente no declara el dato: no se inventa ninguna etiqueta.
+  return null;
+}
+
 export default function VideoPanel({
   result,
   selected,
@@ -39,16 +64,39 @@ export default function VideoPanel({
   onDownloadPhotos,
   onReset,
 }: VideoPanelProps) {
+  const [tab, setTab] = useState<"video" | "audio">("video");
+
   // Cada opción conserva su índice original: el selector de calidades no debe
-  // renumerarse cuando delante hay fotos.
+  // renumerarse cuando delante hay fotos o cuando cambia la pestaña.
   const photos = result.downloads
     .map((option, index) => ({ option, index }))
     .filter((entry) => entry.option.kind === "image");
-  const mediaOptions = result.downloads
+  const mediaEntries = result.downloads
     .map((option, index) => ({ option, index }))
     .filter((entry) => entry.option.kind !== "image");
+  const videoEntries = mediaEntries.filter((entry) => entry.option.kind !== "audio");
+  const audioEntries = mediaEntries.filter((entry) => entry.option.kind === "audio");
+
+  // Con listas largas (YouTube) una sola columna se hace interminable; con
+  // pocas opciones (TikTok) las pestañas sólo añaden un clic más.
+  const useTabs = videoEntries.length >= 8 || audioEntries.length >= 5;
+  const visibleEntries = useTabs
+    ? tab === "audio"
+      ? audioEntries
+      : videoEntries
+    : mediaEntries;
 
   const selectedOption = result.downloads[selected];
+
+  /** Cambia de pestaña y, si la opción marcada no está en ella, marca la primera. */
+  const switchTab = (next: "video" | "audio") => {
+    setTab(next);
+    const list = next === "audio" ? audioEntries : videoEntries;
+    if (!list.some((entry) => entry.index === selected)) {
+      const first = list[0];
+      if (first) onSelect(first.index);
+    }
+  };
 
   return (
     <>
@@ -106,26 +154,56 @@ export default function VideoPanel({
         </>
       )}
 
-      {mediaOptions.length > 0 && (
+      {mediaEntries.length > 0 && (
         <>
           <div className="section-title">Opciones de descarga</div>
-          <div className="options">
-            {mediaOptions.map(({ option, index }) => (
-              <div
-                key={`${option.url}-${index}`}
-                className={`card option${selected === index ? " option--selected" : ""}`}
-                onClick={() => onSelect(index)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") onSelect(index);
-                }}
+
+          {useTabs && (
+            <div className="option-tabs" role="tablist" aria-label="Tipo de opción">
+              <button
+                type="button"
+                role="tab"
+                className="option-tab"
+                aria-selected={tab === "video"}
+                onClick={() => switchTab("video")}
               >
-                <span className="option__radio" aria-hidden="true" />
-                <span className="option__name">{option.name}</span>
-                <span className="option__badge">{optionLabel(option)}</span>
-              </div>
-            ))}
+                Vídeo
+                <span className="option-tab__count">{videoEntries.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                className="option-tab"
+                aria-selected={tab === "audio"}
+                onClick={() => switchTab("audio")}
+              >
+                Audio
+                <span className="option-tab__count">{audioEntries.length}</span>
+              </button>
+            </div>
+          )}
+
+          <div className="options">
+            {visibleEntries.map(({ option, index }) => {
+              const badge = option.kind === "audio" ? null : audioBadge(option);
+              return (
+                <div
+                  key={`${option.url}-${index}`}
+                  className={`card option${selected === index ? " option--selected" : ""}`}
+                  onClick={() => onSelect(index)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") onSelect(index);
+                  }}
+                >
+                  <span className="option__radio" aria-hidden="true" />
+                  <span className="option__name">{option.name}</span>
+                  {badge && <span className={badge.className}>{badge.text}</span>}
+                  <span className="option__badge">{optionLabel(option)}</span>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
