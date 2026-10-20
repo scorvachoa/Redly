@@ -56,6 +56,114 @@ export const SNAPYT_AJAX_URL = envStr(
 );
 
 /**
+ * Fuente de Facebook (FSave). Flujo de tres pasos vía JSON, sin WAF ni
+ * Turnstile: `POST /mint.php` (`getch=1` → challenge; `ch`+`answer` → `dt`)
+ * y `POST /proxy.php` con `{ url, dt }` (resolución del post y sondeo de cada
+ * trabajo de render). Verificado empíricamente.
+ */
+export const FSAVE_BASE_URL = stripSlash(envStr("FSAVE_BASE_URL", "https://fsave.net"));
+export const FSAVE_MINT_URL = envStr("FSAVE_MINT_URL", `${FSAVE_BASE_URL}/mint.php`);
+export const FSAVE_PROXY_URL = envStr("FSAVE_PROXY_URL", `${FSAVE_BASE_URL}/proxy.php`);
+/** JS público que trae la clave del `mint` (se relee si la fuente la detecta girada). */
+export const FSAVE_SENSOR_URL = envStr(
+  "FSAVE_SENSOR_URL",
+  `${FSAVE_BASE_URL}/assets/js/sensor.js`,
+);
+/**
+ * Clave HMAC del `mint` de FSave.
+ *
+ * No es un secreto de usuario: está en claro en `sensor.js`, que el servicio
+ * sirve a todo el mundo. Si el servicio la rotara, `lib/fsave.ts` la vuelve a
+ * leer de ese fichero en el siguiente intento.
+ */
+export const FSAVE_MINT_KEY = envStr("FSAVE_MINT_KEY", "d0776d5ce84657543697c00bab933acb");
+
+/**
+ * Fuente de Instagram (IGExport). API JSON en el mismo origen, sin claves y
+ * sin WAF: `GET /api/ig-reels/?url=<post>&videoOnly=1` resuelve el MP4 de
+ * cualquier publicación con vídeo (reel o `/p/`) y `GET /api/ig-photo/?url=`
+ * devuelve los elementos de una publicación de fotos. Verificado empíricamente.
+ */
+export const IGEXPORT_BASE_URL = stripSlash(
+  envStr("IGEXPORT_BASE_URL", "https://igexport.com"),
+);
+export const IGEXPORT_REELS_URL = envStr(
+  "IGEXPORT_REELS_URL",
+  `${IGEXPORT_BASE_URL}/api/ig-reels/`,
+);
+export const IGEXPORT_PHOTO_URL = envStr(
+  "IGEXPORT_PHOTO_URL",
+  `${IGEXPORT_BASE_URL}/api/ig-photo/`,
+);
+
+/**
+ * oEmbed público de Instagram (título/autor de la publicación).
+ *
+ * Metadato **best-effort**: si Instagram lo rechaza, la fuente se conforma con
+ * el autor o el código de la publicación. Verificado empíricamente (200 sin
+ * cookies ni clave).
+ */
+export const INSTAGRAM_OEMBED_URL = envStr(
+  "INSTAGRAM_OEMBED_URL",
+  "https://www.instagram.com/api/v1/oembed/",
+);
+
+/**
+ * Fuente de Instagram de respaldo (LoveInsta). `POST /proxy.php` con sólo
+ * `url=` (sin claves, sin mint, sin Turnstile y sin desafío de WAF; verificado
+ * incluso sin headers de navegador): el primer POST entrega los `mediaItems`
+ * con el job de render de cada vídeo y, para fotos, la URL directa en
+ * `dl.iamworker.com`. Los jobs de render se resuelven con el `/api/render`
+ * existente (mismo clúster de trabajos que FSave).
+ */
+export const LOVEINSTA_BASE_URL = stripSlash(
+  envStr("LOVEINSTA_BASE_URL", "https://loveinsta.com"),
+);
+export const LOVEINSTA_PROXY_URL = envStr(
+  "LOVEINSTA_PROXY_URL",
+  `${LOVEINSTA_BASE_URL}/proxy.php`,
+);
+
+/**
+ * Fuente de X (Twitter) vía iLoveX (`ilovex.com`). Un solo paso JSON en el
+ * propio origen, sin mint, sin Turnstile y sin claves: `POST /proxy.php` con
+ * `url=<tweet>` devuelve los `mediaItems` (verificado empíricamente). Cada
+ * vídeo es un trabajo de render en `s<nn>.worker<nn>.com` (misma familia de
+ * CDN que FSave/LoveInsta); el sondeo del job es el mismo `POST /proxy.php`
+ * sin sesión, y el `fileUrl` final vive en `dl.iamworker.com` (host ya
+ * permitido; no hace falta ampliar la allowlist).
+ */
+export const ILOVEX_BASE_URL = stripSlash(envStr("ILOVEX_BASE_URL", "https://ilovex.com"));
+export const ILOVEX_PROXY_URL = envStr("ILOVEX_PROXY_URL", `${ILOVEX_BASE_URL}/proxy.php`);
+/**
+ * Sondeos máximos de un trabajo de render de iLoveX antes de rendirse.
+ * En los flujos verificados el job suele estar `Completed` al primer sondeo.
+ */
+export const ILOVEX_RENDER_ATTEMPTS = envNum("ILOVEX_RENDER_ATTEMPTS", 20);
+
+/**
+ * Fuente de Threads vía SaveThreads (`savethreads.com`). Un solo paso JSON en
+ * el propio origen, sin mint, sin Turnstile y sin claves: `POST /proxy.php`
+ * con `url=<post>` devuelve los `mediaItems` (verificado empíricamente). Cada
+ * vídeo es un trabajo de render en `s<nn>.worker<nn>.com` (misma familia de
+ * CDN que FSave/LoveInsta/iLoveX); el sondeo del job es el mismo
+ * `POST /proxy.php` sin sesión, y el `fileUrl` final vive en
+ * `dl.iamworker.com` (host ya en la allowlist; no hace falta ampliarla).
+ */
+export const SAVETHREADS_BASE_URL = stripSlash(
+  envStr("SAVETHREADS_BASE_URL", "https://savethreads.com"),
+);
+export const SAVETHREADS_PROXY_URL = envStr(
+  "SAVETHREADS_PROXY_URL",
+  `${SAVETHREADS_BASE_URL}/proxy.php`,
+);
+/**
+ * Sondeos máximos de un trabajo de render de SaveThreads antes de rendirse.
+ * En los flujos verificados el job suele estar `Completed` al primer sondeo.
+ */
+export const SAVETHREADS_RENDER_ATTEMPTS = envNum("SAVETHREADS_RENDER_ATTEMPTS", 20);
+
+/**
  * Listados de YouTube (YTMP3.gg). La API de metadatos `yt-meta.convert1s.com`
  * sirve el contenido de una lista de reproducción (hasta 100 vídeos por página,
  * con token opaco de continuación), sin clave, WAF ni Turnstile. Verificado
@@ -83,6 +191,12 @@ export const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
 // ---------------------------------------------------------------------------
 /** Tope de vídeos que la API web devolverá por perfil (protege la función). */
 export const API_PROFILE_MAX = envNum("API_PROFILE_MAX", 100);
+
+/**
+ * Sondeos máximos esperando a que FSave termine de preparar un archivo
+ * (render). En la práctica tarda 1–2 sondeos; el tope protege la función.
+ */
+export const FSAVE_RENDER_ATTEMPTS = envNum("FSAVE_RENDER_ATTEMPTS", 20);
 
 // ---------------------------------------------------------------------------
 // Headers de navegador (sin cookies ni tokens personales)
@@ -125,6 +239,64 @@ export const SNAPYT_HEADERS: Record<string, string> = {
   "X-Requested-With": "XMLHttpRequest",
   Origin: SNAPYT_BASE_URL,
   Referer: `${SNAPYT_BASE_URL}/`,
+};
+
+/** Cabeceras para la API JSON de FSave (`mint.php` y `proxy.php`). */
+export const FSAVE_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json, text/javascript, */*; q=0.01",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+  "X-Requested-With": "XMLHttpRequest",
+  Origin: FSAVE_BASE_URL,
+  Referer: `${FSAVE_BASE_URL}/es`,
+};
+
+/** Cabeceras para la API JSON de IGExport (`/api/ig-reels/`, `/api/ig-photo/`). */
+export const IGEXPORT_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  Referer: `${IGEXPORT_BASE_URL}/`,
+};
+
+/** Cabeceras para `POST /proxy.php` de LoveInsta (las mismas del navegador). */
+export const LOVEINSTA_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json, text/javascript, */*; q=0.01",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+  "X-Requested-With": "XMLHttpRequest",
+  Origin: LOVEINSTA_BASE_URL,
+  Referer: `${LOVEINSTA_BASE_URL}/es`,
+};
+
+/** Cabeceras para `POST /proxy.php` de iLoveX (las mismas del navegador). */
+export const ILOVEX_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json, text/javascript, */*; q=0.01",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+  "X-Requested-With": "XMLHttpRequest",
+  Origin: ILOVEX_BASE_URL,
+  Referer: `${ILOVEX_BASE_URL}/es`,
+};
+
+/** Cabeceras para `POST /proxy.php` de SaveThreads (las mismas del navegador). */
+export const SAVETHREADS_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json, text/javascript, */*; q=0.01",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+  "X-Requested-With": "XMLHttpRequest",
+  Origin: SAVETHREADS_BASE_URL,
+  Referer: `${SAVETHREADS_BASE_URL}/es`,
+};
+
+/** Cabeceras para el oEmbed público de Instagram (metadatos best-effort). */
+export const INSTAGRAM_OEMBED_HEADERS: Record<string, string> = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json, text/plain, */*",
 };
 
 /** Cabeceras para la API de metadatos de YTMP3 (`yt-meta.convert1s.com`). */
@@ -241,6 +413,15 @@ export const ALLOWED_DOWNLOAD_HOSTS = [
   "snapyt.app",
   // Por si alguna opción apunta al CDN de vídeo directo de googlevideo.com.
   "googlevideo.com",
+  // Facebook e Instagram (fallback de LoveInsta): el archivo final se sirve
+  // desde `dl.iamworker.com` (host observado en todos los flujos verificados,
+  // incluidos los jobs de render de LoveInsta; el patrón `*.iamworker.com`
+  // cubre las variantes del mismo operador).
+  "iamworker.com",
+  // Instagram: el MP4 de igexport.com vive en el CDN propio de Instagram
+  // (`scontent-<borde>-<n>.cdninstagram.com`), cuyo borde varía por región;
+  // el patrón `*.cdninstagram.com` cubre todas las variantes.
+  "cdninstagram.com",
 ];
 
 // ---------------------------------------------------------------------------

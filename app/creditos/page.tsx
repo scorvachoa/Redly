@@ -95,8 +95,8 @@ export default function CreditsPage() {
         <h2>Servicios de terceros</h2>
         <p>
           Red.ly no analiza el vídeo en casa: el HTML de los vídeos y de los
-          perfiles lo devuelven tres servicios de terceros, a los que sólo se les
-          envían peticiones HTTP normales sobre URLs públicas.
+          perfiles lo devuelven siete servicios de terceros, a los que sólo se
+          les envían peticiones HTTP normales sobre URLs públicas.
         </p>
         <ul>
           <li>
@@ -127,13 +127,61 @@ export default function CreditsPage() {
             Fuente de YouTube: devuelve las opciones de descarga del vídeo
             (vídeos sueltos y Shorts).
           </li>
+          <li>
+            <b>
+              <a href="https://fsave.net/" target="_blank" rel="noreferrer">
+                FSave
+              </a>
+              .</b>{" "}
+            Fuente de Facebook: resuelve vídeos y Reels sueltos y devuelve las
+            opciones de descarga.
+          </li>
+          <li>
+            <b>
+              <a href="https://igexport.com/" target="_blank" rel="noreferrer">
+                IGExport
+              </a>
+              .</b>{" "}
+            Fuente principal de Instagram: resuelve reels y publicaciones
+            sueltas y devuelve el archivo directo del CDN de Instagram.
+          </li>
+          <li>
+            <b>
+              <a href="https://loveinsta.com/" target="_blank" rel="noreferrer">
+                LoveInsta
+              </a>
+              .</b>{" "}
+            Reserva de Instagram: entra cuando IGExport no devuelve nada y
+            resuelve la publicación con un único envío.
+          </li>
+          <li>
+            <b>
+              <a href="https://ilovex.com/es" target="_blank" rel="noreferrer">
+                iLoveX
+              </a>
+              .</b>{" "}
+            Fuente de X (Twitter): resuelve tweets sueltos con un único envío y
+            devuelve los vídeos en una sola calidad.
+          </li>
+          <li>
+            <b>
+              <a href="https://savethreads.com/es" target="_blank" rel="noreferrer">
+                SaveThreads
+              </a>
+              .</b>{" "}
+            Fuente de Threads: resuelve publicaciones sueltas con un único envío
+            y devuelve los vídeos en una sola calidad.
+          </li>
         </ul>
         <p>
-          <b>Red.ly no es una API oficial</b> de TikVid, SavTikPro ni SnapYT, ni
-          de las plataformas de vídeo. Sus endpoints y su HTML no están
-          documentados, pueden cambiar en cualquier momento y estos servicios
-          no patrocinan ni respaldan este proyecto. Los enlaces se citan
-          únicamente para identificar de dónde sale el contenido.
+          <b>Red.ly no es una API oficial</b> de TikVid, SavTikPro, SnapYT,
+          FSave, IGExport, LoveInsta, iLoveX ni SaveThreads, ni de las
+          plataformas de vídeo.
+          Sus
+          endpoints y su HTML no están documentados, pueden cambiar en cualquier
+          momento y estos servicios no patrocinan ni respaldan este proyecto.
+          Los enlaces se citan únicamente para identificar de dónde sale el
+          contenido.
         </p>
 
         <h2>Contenido y derechos</h2>

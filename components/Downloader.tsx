@@ -429,15 +429,19 @@ export default function Downloader({ platform }: { platform: Platform }) {
         .filter((item) => item.kind === "image").length;
       const name = optionFilename(result.videoId, option, photoIndex, images.length);
 
-      // Una URL relativa (`/api/merge?…`) es una opción de YouTube que el
-      // servidor debe combinar (vídeo + audio) antes de poder descargarla.
+      // Una URL relativa (`/api/merge?…` de YouTube o `/api/render?…` de
+      // Facebook) es una opción que el servidor debe preparar antes de poder
+      // descargarla.
       const isMerge = option.url.startsWith("/");
+      const youtube = platform.slug === "youtube";
 
       setBusy(true);
       setStatus({
         kind: "info",
         text: isMerge
-          ? "Combinando vídeo y audio en el servidor…"
+          ? youtube
+            ? "Combinando vídeo y audio en el servidor…"
+            : "Preparando la descarga en el servidor…"
           : option.kind === "image"
             ? "Descargando foto…"
             : "Descargando…",
@@ -445,15 +449,20 @@ export default function Downloader({ platform }: { platform: Platform }) {
       setProgress({
         done: 0,
         total: null,
-        label: isMerge ? "Preparando la mezcla (puede tardar)…" : "Conectando con el CDN…",
+        label: isMerge
+          ? youtube
+            ? "Preparando la mezcla (puede tardar)…"
+            : "Preparando el archivo (puede tardar)…"
+          : "Conectando con el CDN…",
         indeterminate: true,
       });
 
       try {
         let sourceUrl = option.url;
         if (isMerge) {
-          // Fase 1: SnapYT une las pistas y devuelve la URL temporal del
-          // archivo ya con audio (el progreso real empieza en la fase 2).
+          // Fase 1: el servidor prepara el archivo (combinación de pistas en
+          // SnapYT, render en FSave) y devuelve su URL temporal; el progreso
+          // real empieza en la fase 2.
           const prepared = await fetch(option.url);
           const data = (await prepared.json().catch(() => ({}))) as {
             ok?: boolean;
@@ -461,13 +470,18 @@ export default function Downloader({ platform }: { platform: Platform }) {
             url?: string;
           };
           if (!prepared.ok || !data.ok || !data.url) {
-            throw new Error(data.error ?? "No se pudo combinar el vídeo con audio.");
+            throw new Error(
+              data.error ??
+                (youtube
+                  ? "No se pudo combinar el vídeo con audio."
+                  : "No se pudo preparar el archivo."),
+            );
           }
           sourceUrl = data.url;
           setProgress({
             done: 0,
             total: null,
-            label: "Descargando el archivo combinado…",
+            label: youtube ? "Descargando el archivo combinado…" : "Descargando el archivo preparado…",
             indeterminate: true,
           });
         }
@@ -509,7 +523,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
         setBusy(false);
       }
     },
-    [result, destination, history],
+    [result, destination, history, platform],
   );
 
   /**
@@ -855,8 +869,8 @@ export default function Downloader({ platform }: { platform: Platform }) {
                 </>
               ) : (
                 <>
-                  Acepta la URL de un <b>vídeo</b> (también Shorts y enlaces{" "}
-                  <code>youtu.be</code>).
+                  Acepta la URL de un <b>vídeo</b> o de una{" "}
+                  <b>publicación</b> de {platform.name}.
                 </>
               )}{" "}
               Sólo se admite contenido público: no se eluden CAPTCHA ni controles de acceso.

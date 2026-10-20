@@ -13,8 +13,9 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/search  { "url": "https://www.tiktok.com/@user/video/123" }
  *
- * Resuelve un vídeo suelto contra la fuente de su plataforma (TikTok con
- * fallback incluido, YouTube vía SnapYT). Devuelve el título, id, miniatura y
+ * Resuelve un vídeo suelto contra la fuente de su plataforma (TikTok e
+ * Instagram con fallback incluido, YouTube vía SnapYT). Devuelve el título,
+ * id, miniatura y
  * las opciones de descarga.
  *
  * La plataforma y el tipo de URL se deciden con `lib/urlrules.ts` antes de

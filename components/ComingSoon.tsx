@@ -10,7 +10,8 @@ import type { Platform, PlatformKind } from "@/lib/platforms";
  *
  * No se muestra ningún formulario de descarga ni transcripción porque **no hay
  * un origen comprobado** para esa plataforma: no se inventan endpoints, y sólo
- * TikTok y YouTube están verificados empíricamente. Decir «próximamente» es
+ * TikTok, YouTube, Facebook e Instagram están verificados empíricamente (en
+ * Facebook e Instagram, sólo publicaciones sueltas). Decir «próximamente» es
  * preferible a mostrar un botón que no puede funcionar.
  */
 export default function ComingSoon({

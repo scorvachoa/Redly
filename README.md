@@ -1,19 +1,23 @@
 # Red.ly
 
 Cliente TypeScript/Next.js del flujo HTTP de **TikVid** y **SavTikPro** para
-URLs de TikTok, y de **SnapYT** para URLs de YouTube: analiza un vídeo y
-muestra las opciones de descarga, o lista un **perfil completo** de TikTok y
-descarga en lote, reanudando con el historial.
+URLs de TikTok, de **SnapYT** para URLs de YouTube, de **FSave** para URLs de
+Facebook, de **IGExport** (con **LoveInsta** de respaldo) para URLs de
+Instagram, de **iLoveX** para URLs de X (Twitter) y de **SaveThreads** para
+URLs de Threads: analiza un vídeo y muestra las opciones de descarga, o lista
+un **perfil completo** de TikTok y descarga en lote, reanudando con el
+historial.
 
 Es una aplicación web: interfaz en el navegador + API propia que hace de proxy.
 
 **Web desplegada:** <https://red-ly.vercel.app/>
 
-> **No es una API oficial de TikVid, SavTikPro ni SnapYT.** Los endpoints y el
-> HTML no están documentados y pueden cambiar en cualquier momento. El proyecto
-> trabaja únicamente con URLs públicas y peticiones HTTP normales, sin
-> autenticación, sin cookies personales y sin medidas de evasión: no se saltan
-> CAPTCHAs ni controles de acceso.
+> **No es una API oficial de TikVid, SavTikPro, SnapYT, FSave, IGExport,
+> LoveInsta, iLoveX ni SaveThreads.** Los
+> endpoints y el HTML no están documentados y pueden cambiar en cualquier
+> momento. El proyecto trabaja únicamente con URLs públicas y peticiones HTTP
+> normales, sin autenticación, sin cookies personales y sin medidas de evasión:
+> no se saltan CAPTCHAs ni controles de acceso.
 
 ---
 
@@ -54,7 +58,7 @@ npm run smoke      # handlers de la API contra la red real
 | Ruta | Contenido |
 | --- | --- |
 | `/` | Portada: hero, plataformas, «Obtener programa» y pie |
-| `/download/<plataforma>` | Descargador. Funcionan `tiktok` y `youtube`; el resto muestra «Próximamente» |
+| `/download/<plataforma>` | Descargador. Funcionan `tiktok`, `youtube`, `facebook`, `instagram`, `twitter` y `threads`; el resto muestra «Próximamente» |
 | `/transcript/<plataforma>` | Transcripción. Todas las plataformas muestran «Próximamente» |
 | `/privacidad` | Política de datos: qué se guarda, qué no, y con qué terceros |
 | `/creditos` | Créditos: tecnologías, iconos y licencias, despliegue y origen del proyecto |
@@ -64,11 +68,12 @@ Plataformas: `tiktok`, `youtube`, `facebook`, `instagram`, `twitter`, `threads`
 (el registro vive en `lib/platforms.ts`). Una ruta desconocida cae en el 404
 propio, que lista las plataformas disponibles.
 
-> **Sólo TikTok y YouTube están implementados.** Las demás existen en la
-> estructura de navegación, pero no se les asigna ningún endpoint: no se
-> inventan APIs, y no hay ninguna fuente comprobada para ellas. La página
-> «Próximamente» lo explica en lugar de mostrar un botón que no podría
-> funcionar. Con la transcripción pasa lo mismo en **todas** las plataformas.
+> **TikTok, YouTube, Facebook, Instagram, X (Twitter) y Threads están
+> implementados.** Las demás existen en la estructura de navegación, pero no se
+> les asigna ningún endpoint: no se inventan APIs, y no hay ninguna fuente
+> comprobada para ellas. La página «Próximamente» lo explica en lugar de
+> mostrar un botón que no podría funcionar. Con la transcripción pasa lo mismo
+> en **todas** las plataformas.
 
 ### Estilo y PWA
 
@@ -123,17 +128,122 @@ el vídeo:
 * Una única fuente (**SnapYT**), sin cadena de respaldo. El nombre de archivo
   usa el id de YouTube (`Redly_dQw4w9WgXcQ.mp4`).
 
+### Descargador de Facebook
+
+Mismo descargador (`/download/facebook`), con **FSave** como fuente única:
+
+* Se aceptan **vídeos sueltos**: `watch?v=`, `/reel/<id>`, `/videos/<id>/`,
+  `story.php?story_fbid=…`, enlaces cortos `fb.watch` y variantes `m.`/`fb.com`.
+  Las **páginas** no tienen listado: se rechazan con un mensaje claro
+  (`supportsProfiles: false`; `/api/profile` → `501`).
+* Las opciones llegan **ordenadas de mayor a menor** —vídeo por resolución y
+  audio por bitrate—, cada vídeo con su etiqueta de audio (los MP4 de FSave son
+  progresivos, **con audio** de fábrica) y la pista de audio aparte (M4A 64 kbps).
+* Las opciones apuntan a `/api/render?job=…`: la interfaz espera a que el
+  servidor resuelva el trabajo de FSave («Preparando la descarga en el
+  servidor…») y después baja el archivo por `/api/download` de siempre.
+* El nombre de archivo usa el id del vídeo de Facebook
+  (`Redly_10153231379946729.mp4`).
+
+### Descargador de Instagram
+
+Mismo descargador (`/download/instagram`), con **IGExport** como fuente
+primaria y **LoveInsta** como respaldo (cadena `searchAny` al estilo de
+SavTikPro → TikVid):
+
+* Se aceptan **publicaciones sueltas**: `/reel/<código>`, `/reels/<código>`,
+  `/p/<código>` (vídeo o fotos), variantes con prefijo de usuario
+  (`/<usuario>/reel/<código>`), con `?igsh=` y `m.`. Los **perfiles** no tienen
+  listado: se rechazan con un mensaje claro (`supportsProfiles: false`;
+  `/api/profile` → `501`).
+* Las opciones de IGExport apuntan **directamente** al CDN de Instagram
+  (`scontent-*.cdninstagram.com`): no hay fase de render, la interfaz baja el
+  MP4 por `/api/download` de siempre. El enlace va firmado y caduca en ~2 días,
+  suficiente porque se consume al analizar.
+* Si IGExport falla (contenido no disponible, 5xx agotados…), el respaldo
+  **LoveInsta** resuelve la publicación con un único `POST /proxy.php`: los
+  vídeos llevan el trabajo de render a `/api/render` (mismo patrón que FSave,
+  resolución al pulsar) y las fotos, su URL directa en `dl.iamworker.com`.
+* Una publicación de **fotos/carrusel** de IGExport cae en `/api/ig-photo/` y
+  devuelve una opción por imagen, con miniatura propia y «Descargar todas»
+  (mismo comportamiento que los carruseles de TikTok).
+* El título viene del **oEmbed público** de Instagram (best-effort): si falla,
+  manda el autor (`@usuario`) y, en último término, el código de la
+  publicación. El nombre de archivo usa ese código
+  (`Redly_DeMbuYlBfMk.mp4`).
+
+### Descargador de X (Twitter)
+
+Mismo descargador (`/download/twitter`), con **iLoveX** como única fuente
+(`IlovexSource` en `lib/ilovex.ts`), sin listados de perfiles:
+
+* Se aceptan **tweets sueltos** con cualquier variante de host (`x.com`,
+  `twitter.com`, con `?s=`/`?t=`/`?ref_src=` y sin barra final). Los **perfiles**
+  no tienen listado: se rechazan con un mensaje claro (`supportsProfiles:
+  false`; `/api/profile` → `501`); `/search`, `/hashtag/…` y los enlaces
+  acortados `t.co` no clasifican (`400`).
+* El flujo —verificado empíricamente, sin WAF, sin Turnstile y sin claves— son
+  dos pasos de `POST /proxy.php`:
+  1. **Resolución**: `url=<tweet>` → `{ api: { service: "X", status: "ok",
+     title, description, userInfo, mediaStats, mediaItems } }`. Un elemento por
+     medio: los **vídeos** traen el trabajo de render del clúster
+     `s<nn>.worker<nn>.com/v5/video/<id>/<mediaId>/<calidad>` y las **fotos**,
+     su URL directa en `dl.iamworker.com` si superan la allowlist de hosts.
+  2. **Render** (sólo vídeo): la opción es relativa (`/api/render?job=…` con
+     `source=ilovex`), igual que FSave/LoveInsta: el servidor sondea el job
+     hasta `"Completed"` y entrega el `fileUrl` en `dl.iamworker.com` con
+     `Content-Disposition` y Range/206, **con audio** (pistas `soun` + `mp4a`
+     verificadas).
+* Cada vídeo se ofrece en **una sola calidad** (la que trae el job; el servicio
+  no expone calidades múltiples) y el título se limpia del prefijo
+  `«<autor> en X: …»`. El nombre de archivo usa el id del tweet
+  (`Redly_2109957980011552839.mp4`).
+* Errores del servicio: `TWEET_UNAVAILABLE`, `Media unavailable.` y
+  `service !== "X"` → `UnavailableError` (mensaje claro); cuerpo no JSON o
+  `429/5xx` → reintento con backoff.
+
+### Descargador de Threads
+
+Mismo descargador (`/download/threads`), con **SaveThreads** como única fuente
+(`SavethreadsSource` en `lib/savethreads.ts`), sin listados de perfiles:
+
+* Se aceptan **publicaciones sueltas** en ambos dominios (`threads.com` y
+  `threads.net`, con o sin `www.`, con o sin slug de texto tras el código).
+  Los **perfiles** no tienen listado: se rechazan con un mensaje claro
+  (`supportsProfiles: false`; `/api/profile` → `501`); `/search`, `/tag/…` y
+  las rutas raíz no clasifican (`400`).
+* El flujo —verificado empíricamente, sin WAF, sin Turnstile y sin claves— son
+  dos pasos de `POST /proxy.php`:
+  1. **Resolución**: `url=<post>` → `{ api: { service: "Threads", status: "ok",
+     description, userInfo, mediaItems } }`. Un elemento por medio del
+     carrusel: los **vídeos** traen el trabajo de render del clúster
+     `s<nn>.worker<nn>.com/v5/video/<id>/<mediaId>/<calidad>` y las **fotos**,
+     su URL directa en `dl.iamworker.com` si superan la allowlist de hosts.
+  2. **Render** (sólo vídeo): la opción es relativa (`/api/render?job=…` con
+     `source=savethreads`), igual que FSave/LoveInsta/iLoveX: el servidor
+     sondea el job hasta `"Completed"` y entrega el `fileUrl` en
+     `dl.iamworker.com` con `Content-Disposition` y Range/206, **con audio**.
+* Cada vídeo se ofrece en **una sola calidad** (la que trae el job; el servicio
+  entrega la máxima que ofrece Threads, p. ej. 720p) y el título usa la
+  descripción del post (o `@autor`). El nombre de archivo usa el código del
+  post (`Redly_DWSFx_jErAQ.mp4`).
+* Errores del servicio: `POST_UNAVAILABLE`, `service !== "Threads"` y
+  maintenance → `UnavailableError` (mensaje claro); cuerpo no JSON o
+  `429/5xx` → reintento con backoff. Los tokens de descarga caducan (~2 h según
+  la FAQ del servicio): se resuelven al pulsar, sin cachear.
+
 ---
 
 ## API
 
-Cuatro rutas bajo `/api`, implementadas como Route Handlers de Next.js:
+Cinco rutas bajo `/api`, implementadas como Route Handlers de Next.js:
 
 | Ruta | Método | Body / Query | Descripción |
 | --- | --- | --- | --- |
 | `/api/search` | `POST` | `{ url }` | Analiza **un vídeo**: título, ID, miniatura y opciones |
 | `/api/profile` | `POST` | `{ url, max?, cursor?, page? }` | Devuelve **una página** de un perfil y el `next_cursor` |
 | `/api/merge` | `GET` | `?yt=&v=&a=` | combina vídeo+audio de YouTube en SnapYT y devuelve la URL del MP4 ya unido |
+| `/api/render` | `GET` | `?job=&source=` | resuelve un trabajo de render (FSave/Facebook, LoveInsta/Instagram, iLoveX/X o SaveThreads/Threads) y devuelve la URL temporal del archivo |
 | `/api/download` | `GET` | `?url=&name=` | hace de proxy de streaming con `Content-Disposition: attachment` |
 
 ### Paginación de perfiles
@@ -186,7 +296,7 @@ cualquier destino.
 
 ### Límite de tasa
 
-Las cuatro rutas comparten un único límite en memoria y por ventana deslizante
+Las cinco rutas comparten un único límite en memoria y por ventana deslizante
 (`lib/ratelimit.ts`): por defecto **30 peticiones por 60 segundos** por
 cliente (`RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_SECONDS`), con `429` y
 `Retry-After` al superarlo. La clave del cliente sale de `x-forwarded-for`
@@ -213,6 +323,10 @@ Las rutas no instancian proveedores a pelo: la clasificación sale de
 | --- | --- | --- | --- |
 | `TikTokSource` | `tiktok` | TikTok | `searchVideo` con fallback SavTikPro → TikVid, perfiles en `SavetikSource` |
 | `SnapYTSource` | `snapyt` | YouTube | única fuente (sin cadena de respaldo); vídeo suelto + listas (vía YTMP3.gg) |
+| `FsaveSource` | `fsave` | Facebook | única fuente; vídeo suelto (mint → resolve → render diferido) |
+| `InstagramSource` | `instagram` | Instagram | `searchVideo` con fallback IGExport → LoveInsta, publicación suelta (sin listados) |
+| `IlovexSource` | `ilovex` | X (Twitter) | única fuente; tweet suelto (resolve → render diferido; sin listados) |
+| `SavethreadsSource` | `savethreads` | Threads | única fuente; publicación suelta (resolve → render diferido; sin listados) |
 
 ```ts
 interface ContentSource {
@@ -225,17 +339,22 @@ interface ContentSource {
 ```
 
 Añadir otra plataforma significa implementar el contrato y registrarla, sin
-tocar las rutas: sin reglas → `400`; con reglas pero sin fuente → `501`.
-SavTikPro, TikVid y SnapYT son terceros sin contrato estable; si hay que
-cambiar de proveedor, el cambio se confina en un módulo.
+toccar las rutas: sin reglas → `400`; con reglas pero sin fuente → `501`.
+SavTikPro, TikVid, SnapYT, FSave, IGExport, LoveInsta, iLoveX y SaveThreads son
+terceros sin contrato estable; si hay que cambiar de proveedor, el cambio se
+confina en un módulo.
 
 ### CORS y despliegue en Vercel
 
 El navegador habla **sólo con la API de Red.ly**, que a su vez habla con los
 servicios de terceros: no hay CORS hacia ellos. `vercel.json` fija
 `maxDuration: 60` para `app/api/**`; `/api/merge` lo sube a `120` porque
-espera la cola de combinación de SnapYT. El lote **no** corre en el servidor
-(sin FS persistente entre invocaciones): la cola vive en el navegador.
+espera la cola de combinación de SnapYT y `/api/render` reserva ese mismo
+tope (60 s) para los sondeos de render de FSave, LoveInsta, iLoveX y
+SaveThreads. El lote
+**no** corre en el
+servidor (sin FS persistente entre invocaciones): la cola vive en el
+navegador.
 
 ---
 
@@ -291,13 +410,14 @@ Redly/
 │   ├── favicon.ico             # derivado: 16/32/48 vía scripts/make-favicon.cjs
 │   ├── apple-icon.png          # derivado: 180x180 opaco para iOS
 │   ├── manifest.ts             # manifiesto PWA (convención de ficheros de Next)
-│   ├── download/[platform]/    # /download/{tiktok,youtube} (UI) | resto: "Próximamente"
+│   ├── download/[platform]/    # /download/{tiktok,youtube,facebook,instagram,twitter,threads} (UI) | resto: "Próximamente"
 │   ├── transcript/[platform]/  # /transcript/* → todas "Próximamente"
 │   └── api/
 │       ├── _responses.ts       # errorResponse() compartido (archivo privado)
 │       ├── search/route.ts     # POST: analiza un vídeo
 │       ├── profile/route.ts    # POST: una página de perfil + next_cursor
 │       ├── merge/route.ts      # GET: combina vídeo+audio (SnapYT vd_mux)
+│       ├── render/route.ts     # GET: resuelve el render de FSave/LoveInsta/iLoveX/SaveThreads
 │       └── download/route.ts   # GET: streaming + lista blanca de hosts
 │
 ├── public/                     # estáticos servidos en la raíz del sitio
@@ -327,7 +447,7 @@ Redly/
 │   ├── exceptions.ts           # jerarquía TikVidError
 │   ├── models.ts               # TikTokResult, ProfileVideo, optionLabel, bestQualityOption
 │   ├── platforms.ts            # registro de plataformas (fuente única de rutas)
-│   ├── sources.ts              # contrato ContentSource + registro (TikTokSource, SnapYTSource)
+│   ├── sources.ts              # contrato ContentSource + registro (TikTok, SnapYT, FSave, Instagram, iLoveX, SaveThreads)
 │   ├── urlrules.ts             # reglas de URL por plataforma (clasificación de la entrada)
 │   ├── site.ts                 # constantes de UI (REPO_URL, enlace de la app)
 │   ├── ratelimit.ts            # límite de tasa por cliente (ventana deslizante)
@@ -336,12 +456,21 @@ Redly/
 │   ├── sanitize.ts             # nombres de archivo/carpeta (apt navegador)
 │   ├── urls.ts                 # URLs de TikTok: validación, handle y carpeta
 │   ├── youtube-urls.ts         # URLs de YouTube: vídeo, canal y lista (apt navegador)
+│   ├── facebook-urls.ts        # URLs de Facebook: vídeo y página (apt navegador)
+│   ├── instagram-urls.ts       # URLs de Instagram: publicación y perfil (apt navegador)
+│   ├── threads-urls.ts         # URLs de Threads: publicación y perfil (apt navegador)
+│   ├── twitter-urls.ts         # URLs de X (Twitter): tweet y perfil (apt navegador)
 │   ├── http.ts                 # fetch con timeouts, reintentos y backoff
 │   ├── parser.ts               # HTML -> TikTokResult (cheerio, selectores con fallback)
 │   ├── client.ts               # TikVidClient: POST /api/ajaxSearch
 │   ├── savetik.ts              # SavTikPro: página única, perfiles, 1 vídeo, searchAny
 │   ├── snapyt.ts               # SnapYT: YouTube en 3 pasos vía admin-ajax (vídeo + listas)
 │   ├── ytmp3.ts                # YTMP3.gg: listas vía API de metadatos yt-meta (+ og:title)
+│   ├── fsave.ts                # FSave: mint HMAC → resolve → render (Facebook)
+│   ├── igexport.ts             # IGExport: ig-reels → ig-photo + oEmbed (Instagram, con searchAny)
+│   ├── loveinsta.ts            # LoveInsta: respaldo de Instagram (POST /proxy.php → jobs)
+│   ├── ilovex.ts               # iLoveX: tweet de X (resolve → render, POST /proxy.php)
+│   ├── savethreads.ts          # SaveThreads: publicación de Threads (resolve → render, POST /proxy.php)
 │   ├── history.ts              # historial de descargas (storage inyectable)
 │   ├── fsaccess.ts             # sinks de escritura + selector de carpeta (web)
 │   └── downloader.ts           # resolveUrl (redirects), sanitizeFilename, streaming
@@ -521,18 +650,189 @@ de la lista.
 
 ---
 
+## Facebook (FSave)
+
+Facebook se resuelve con **una única fuente, FSave** (`FsaveSource` en
+`lib/fsave.ts`), sin listados de páginas. El flujo —verificado empíricamente,
+sin navegador ni claves, todo server-side— son tres pasos de sesión y un
+trabajo de render:
+
+1. **Mint** (`POST https://fsave.net/mint.php`): `getch=1` devuelve un
+   challenge `ch` de un solo uso; se responde con
+   `answer = HMAC-SHA256(ch, K)` recortado a 32 hex. La clave `K` está en
+   claro en el JS público del servicio (`/assets/js/sensor.js`): si girara, se
+   relee de ahí y se reintenta una vez. La respuesta es `dt`, el token de
+   sesión (caduca; se pide **en cada invocación**, sin cachear).
+2. **Resolve** (`POST /proxy.php` con `url` + `dt`): devuelve el `api` del
+   post (título, `id`, miniatura, `mediaItems[]`). Sin `dt` válido responde
+   `403 STALE_PAGE` → se renueva el mint y se reintenta una vez.
+3. **Render** (`POST /proxy.php` con el `mediaUrl` del trabajo): sondea el
+   progreso hasta `"Completed"` y devuelve `fileUrl` (host `dl.iamworker.com`,
+   con `Content-Disposition` y soporte de `Range`; el enlace vive ≥10 min).
+
+Reglas comprobadas:
+
+* `mediaItems[]` trae MP4 progresivos (`1080x1920`, `720x1280`…, **con audio**)
+  y una pista M4A de 64 kbps. Las calidades se ordenan de mayor a menor (el
+  `quality` es el lado corto de la resolución: `1080p`, `720p`).
+* Los `mediaUrl` de vídeo no son descargables: sólo devuelven el estado del
+  trabajo, así que las opciones entregan una **URL relativa**
+  `/api/render?job=<mediaUrl>` y el render se resuelve en el servidor.
+* `app/api/render/route.ts` valida el `job` contra el patrón del CDN de FSave
+  (`isFsaveJobUrl`), pide un `dt` fresco, sondea con tope y valida el
+  `fileUrl` final contra `ALLOWED_DOWNLOAD_HOSTS` (errores: `400`, `410` si el
+  servicio no lo resuelve, `502`, `429`; `maxDuration = 60`).
+* Errores del servicio: `INVALID_URL`/`WRONG_SERVICE` → `UnavailableError`
+  (mensaje claro), `FETCH_ERROR` → reintento, `429/5xx` → backoff.
+* Formas de enlace aceptadas (`lib/facebook-urls.ts`): `watch?v=`,
+  `/reel/<id>`, `/videos/<id>/`, `story.php?story_fbid=`, `share/v/`,
+  `fb.watch/<código>`; las páginas (`/usuario`, `profile.php?id=`) clasifican
+  como perfil y la fuente las rechaza sin tocar la red.
+
+---
+
+## Instagram (IGExport + LoveInsta)
+
+Instagram se resuelve con la fachada `InstagramSource` (`lib/sources.ts`), que
+encadena **IGExport** (`IgexportSource` en `lib/igexport.ts`) con el respaldo
+**LoveInsta** (`LoveInstaSource` en `lib/loveinsta.ts`), sin listados de
+páginas en ninguno de los dos. El flujo primario —verificado empíricamente,
+sin navegador ni claves, todo server-side— son dos endpoints JSON y un oEmbed:
+
+1. **Vídeo** (`GET https://igexport.com/api/ig-reels/?url=<publicación>&videoOnly=1`):
+   devuelve `{ ok, media: { videoUrl, thumbnailUrl, filename } }` con el MP4
+   **directo** en el CDN de Instagram. Si la publicación no tiene vídeo, responde
+   `404 not_found` y se pasa al paso 2.
+2. **Fotos** (`GET /api/ig-photo/?url=<publicación>`): devuelve
+   `{ ok, media: { shortcode, items: [...] } }` con los elementos de una
+   publicación de fotos o carrusel (cada elemento con su `type`).
+3. **Metadatos** (`GET https://www.instagram.com/api/v1/oembed/?url=…&format=json`):
+   título (pie) y autor, en modo **best-effort**: un solo intento y, si falla,
+   el título cae al autor o al código de la publicación.
+
+Reglas comprobadas:
+
+* El archivo vive en `scontent-<borde>-<n>.cdninstagram.com` (el borde varía por
+  región, por eso la allowlist casa con el sufijo `cdninstagram.com`); admite
+  `Range` con `206`, es `video/mp4` **con audio** (pistas `soun` + `mp4a`
+  verificadas) y no trae `Content-Disposition`, que lo pone `/api/download`.
+* La URL va firmada y caduca en ~2 días (`oe`): se consume al analizar; si se
+  reintenta desde el historial pasado ese plazo, hay que volver a analizar.
+* Errores del servicio: `invalid_url`/`not_found` → `UnavailableError` (mensaje
+  claro), `429/5xx` y cuerpos no JSON (p. ej. el `502` HTML de `ig-posts`) →
+  reintento con backoff.
+* Formas de enlace aceptadas (`lib/instagram-urls.ts`): `/reel/<código>`,
+  `/reels/<código>`, `/p/<código>`, `/tv/<código>`, con prefijo de usuario, con
+  query (`?igsh=`) y sin barra final; las páginas (`/usuario`) clasifican como
+  perfil y la fuente las rechaza sin tocar la red.
+
+### Respaldo: LoveInsta
+
+Cuando IGExport devuelve un error de la casa (`invalid_url`, `not_found`,
+`5xx` agotados…), `searchAny` prueba con **LoveInsta** —espejo de la cadena
+SavTikPro → TikVid— cuyo flujo, verificado empíricamente sin WAF y sin claves
+(incluso con un `POST` sin headers de navegador), es un solo paso:
+
+1. **Resolución** (`POST https://loveinsta.com/proxy.php` con `url=<publicación>`):
+   devuelve `{ api: { service: "Instagram", status: "ok", title, mediaItems } }`
+   con un elemento por medio de la publicación: los **vídeos** traen el trabajo
+   de render del clúster `s<nn>.worker<nn>.com/v5/video/<id>/<hash>/<calidad>`
+   y las **fotos**, la URL directa en `dl.iamworker.com`.
+2. **Vídeos**: la opción es relativa (`/api/render?job=…`), igual que FSave: el
+   servidor sondea el job con el mint de FSave (mismo clúster; resolución
+   verificada de un job de LoveInsta con el flujo de `/api/render` existente) y
+   entrega el `fileUrl` en `dl.iamworker.com` con `Content-Disposition` y
+   Range/206, **con audio** (pistas `soun` + `mp4a` verificadas).
+3. **Fotos**: URL directa validada contra la allowlist (`image/jpeg`,
+   `attachment`); el token firma la URL y se comprobó **viva ≥10 min**, pero
+   conviene consumirla al momento (igual que el resto de enlaces temporales).
+
+Errores del servicio (todos JSON): `400 INVALID_URL`/`WRONG_SERVICE` y
+`200 api.status:"error"` (`MEDIA_UNAVAILABLE`, `VIDEO_NOT_FOUND`) →
+`UnavailableError`; cuerpo no JSON o `429/5xx` → reintento con backoff.
+
+---
+
+## Threads (SaveThreads)
+
+Threads se resuelve con **una única fuente, SaveThreads** (`SavethreadsSource`
+en `lib/savethreads.ts`), sin listados de páginas. El flujo —verificado
+empíricamente, sin WAF, sin Turnstile y sin claves, todo server-side— es el
+mismo patrón que iLoveX (mismo clúster de trabajos `worker*.com`):
+
+1. **Resolución** (`POST https://savethreads.com/proxy.php` con
+   `url=<publicación>`): devuelve
+   `{ api: { service: "Threads", status: "ok", description, userInfo,
+   mediaItems } }` con un elemento por medio del carrusel: los **vídeos** traen
+   el trabajo de render del clúster
+   `s<nn>.worker<nn>.com/v5/video/<id>/<mediaId>/<calidad>` y las **fotos**, la
+   URL directa en `dl.iamworker.com`.
+2. **Vídeos**: la opción es relativa (`/api/render?job=…&source=savethreads`),
+   resolución perezosa al pulsar: el servidor sondea el job sin sesión hasta
+   `"Completed"` y entrega el `fileUrl` en `dl.iamworker.com` con
+   `Content-Disposition` y Range/206, **con audio**.
+3. **Fotos**: URL directa validada contra la allowlist (`image/jpeg`,
+   `attachment`, Range/206); el token firma la URL y la FAQ del servicio habla
+   de ~2 horas de vida, así que conviene consumirla al momento.
+
+Reglas comprobadas:
+
+* Acepta ambos dominios (`threads.com` y `threads.net`); el código del post es
+  alfanumérico con guiones bajos (`DWSFx_jErAQ`) y a veces va seguido de un
+  slug legible.
+* Cada vídeo se ofrece en **una sola calidad** (la máxima que entrega Threads,
+  p. ej. `720p`); el carrusel se muestra elemento a elemento (vídeos y fotos
+  por separado, en ese orden).
+* Errores del servicio: `POST_UNAVAILABLE`/`service !== "Threads"` →
+  `UnavailableError` (mensaje claro); cuerpo no JSON o `429/5xx` → reintento
+  con backoff (el propio JS del servicio contempla 429 con backoff creciente).
+* Formas de enlace aceptadas (`lib/threads-urls.ts`): `/@usuario/post/<código>`
+  con o sin slug final, en `threads.com`/`threads.net`; los perfiles
+  (`/@usuario`) clasifican como perfil y la fuente los rechaza sin tocar la
+  red.
+
+---
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-205 tests en 16 ficheros, **sin Internet** (mock de `fetch` encolado y fixtures
+381 tests en 25 ficheros, **sin Internet** (mock de `fetch` encolado y fixtures
 HTML anonimizadas en `tests/fixtures/`, con pids/nonces sustituidos por
 valores ficticios):
 
-* `platforms` · `sources` · `urlrules` · `urls` · `youtube-urls` — registro de
-  plataformas/fuentes, contrato `ContentSource` y validación de URLs.
+* `platforms` · `sources` · `urlrules` · `urls` · `youtube-urls` ·
+  `facebook-urls` (11) · `instagram-urls` (9) · `threads-urls` (8) ·
+  `twitter-urls` (8) — registro de
+  plataformas/fuentes, contrato `ContentSource` y validación/clasificación de
+  URLs.
+* `fsave` (28) — mint HMAC (incluida la rotación de clave vía `sensor.js`),
+  resolución de posts, sondeo de render, mapeo al modelo y errores del
+  servicio (`STALE_PAGE`, `WRONG_SERVICE`, no JSON…), sin red.
+* `igexport` (23) — resolución de reels con el MP4 directo, caída a fotos ante
+  un `404`, carruseles, filtrado de hosts, mapeo de errores (`invalid_url`,
+  `502` no JSON), reintentos de red, el título del oEmbed con sus fallbacks y
+  la cadena `searchAny` (primario → respaldo, incluida la propagación de
+  errores ajenos a la casa).
+* `loveinsta` (19) — el respaldo de Instagram en un solo `POST`: jobs de render
+  como opción perezosa con la calidad leída del job, fotos directas con
+  miniatura, mezcla vídeo+foto con orden estable, mapeo de errores
+  (`INVALID_URL`, `WRONG_SERVICE`, `MEDIA_UNAVAILABLE`, no JSON), reintentos
+  ante `429`/red y validación de jobs y hosts.
+* `ilovex` (23) — la fuente de X en dos `POST /proxy.php`: resolución de un
+  tweet (vídeo con job de render perezoso + foto directa si supera la
+  allowlist, mezcla con orden estable), sondeo de render (`Completed`,
+  `fileUrl`, `percent`), errores del servicio (`TWEET_UNAVAILABLE`,
+  `Media unavailable.`, `service` ajeno, no JSON), reintentos, limpieza del
+  título y validación de jobs y hosts.
+* `savethreads` (23) — la fuente de Threads en dos `POST /proxy.php`:
+  resolución de una publicación (vídeo con job de render perezoso + foto
+  directa si supera la allowlist, orden por altura), sondeo de render
+  (`Completed`, `fileUrl`, `percent`), errores del servicio
+  (`POST_UNAVAILABLE`, `service` ajeno, no JSON), reintentos, limpieza del
+  título y validación de jobs y hosts.
 * `snapyt` (22) — preview → modelo (orden, `data-kind`, merge), flujo de tres
   pasos, reintentos y errores.
 * `ytmp3` (9) — listas de YouTube vía YTMP3.gg: mapeo a `ProfileVideo`, título
@@ -558,8 +858,19 @@ npm run smoke   # invoca los handlers de /api/* con Request reales
 Cubre la paginación real de un perfil (sigue el `next_cursor` y comprueba que
 la página 2 no se solapa), el flujo de combinación de YouTube completo:
 opción máxima → `/api/merge` → URL temporal → bytes del MP4 con audio por
-`/api/download`, y el listado de una lista de reproducción real vía
-YTMP3.gg (`postUrl` apunta al watch URL de cada vídeo).
+`/api/download`, el listado de una lista de reproducción real vía YTMP3.gg
+(`postUrl` apunta al watch URL de cada vídeo), el flujo de Facebook completo:
+búsqueda real en FSave → `/api/render` → bytes del MP4 por `/api/download`,
+más el rechazo de páginas sin listado, el flujo de Instagram completo:
+búsqueda real en IGExport → opciones directas en el CDN de Instagram → bytes
+del MP4 por `/api/download`, más el rechazo de perfiles sin listado, el
+flujo del respaldo de Instagram: búsqueda real en LoveInsta → `/api/render`
+(job del clúster) → bytes del MP4 por `/api/download`, el flujo de X completo:
+búsqueda real en iLoveX → `/api/render?source=ilovex` (job del clúster) →
+bytes del MP4 por `/api/download`, más el rechazo de perfiles sin listado, el
+flujo de Threads completo: búsqueda real en SaveThreads →
+`/api/render?source=savethreads` (job del clúster) → bytes del MP4 por
+`/api/download`, más el rechazo de perfiles sin listado.
 
 ---
 
@@ -574,6 +885,13 @@ TIKVID_BASE_URL / TIKVID_AJAX_SEARCH_URL
 SNAPYT_BASE_URL / SNAPYT_AJAX_URL   # fuente de YouTube (SnapYT)
 YT_YTMP3_META_BASE_URL / YT_YTMP3_PLAYLIST_PATH / YT_YTMP3_MAX_PER_PAGE
                             # listas de YouTube (YTMP3.gg, API de metadatos)
+FSAVE_BASE_URL / FSAVE_MINT_URL / FSAVE_PROXY_URL / FSAVE_SENSOR_URL
+FSAVE_MINT_KEY / FSAVE_RENDER_ATTEMPTS   # fuente de Facebook (FSave)
+IGEXPORT_BASE_URL / IGEXPORT_REELS_URL / IGEXPORT_PHOTO_URL
+INSTAGRAM_OEMBED_URL              # fuente primaria de Instagram (IGExport) + oEmbed
+LOVEINSTA_BASE_URL / LOVEINSTA_PROXY_URL   # respaldo de Instagram (LoveInsta)
+ILOVEX_BASE_URL / ILOVEX_PROXY_URL / ILOVEX_RENDER_ATTEMPTS   # fuente de X (iLoveX)
+SAVETHREADS_BASE_URL / SAVETHREADS_PROXY_URL / SAVETHREADS_RENDER_ATTEMPTS   # fuente de Threads (SaveThreads)
 REQUEST_TIMEOUT / DOWNLOAD_TIMEOUT / MAX_REDIRECTS
 RETRY_ATTEMPTS / RETRY_BACKOFF_SECONDS
 API_PROFILE_MAX              # tope de vídeos POR INVOCACIÓN (no por perfil)
@@ -611,8 +929,11 @@ Notas:
 
 ## Limitaciones
 
-* TikVid, SavTikPro y SnapYT no ofrecen APIs públicas documentadas: los
-  endpoints, el HTML, las clases CSS y los CDNs pueden cambiar sin aviso.
+* TikVid, SavTikPro, SnapYT, FSave, IGExport, LoveInsta, iLoveX y SaveThreads
+  no ofrecen
+  APIs públicas
+  documentadas: los endpoints, el HTML, las claves embebidas en su JS, las
+  clases CSS y los CDNs pueden cambiar sin aviso.
 * El acceso puede estar protegido por Cloudflare; una respuesta HTML en lugar
   de JSON se reporta como error claro.
 * Las URLs temporales expiran (`403/404/410`). Si el token caducó, hay que
@@ -639,10 +960,41 @@ Notas:
   pistas en el servidor de SnapYT (ver «YouTube» → «Vídeo + audio»); la
   combinación depende de la cola de esa web (90 s de tope) y, si SnapYT
   retira el formulario, las opciones vuelven a bajar sin audio como antes.
-* Se soportan **TikTok** y **YouTube**. Las rutas
-  `/download/{facebook,instagram,twitter,threads}` y `/transcript/*` existen en
-  la navegación pero muestran «Próximamente»: no hay ninguna fuente comprobada
-  para ellas y no se inventan endpoints.
+* En Facebook están los **vídeos sueltos** (vía FSave: `watch`, `reel`,
+  `videos`, `story.php`, `fb.watch`): las **páginas** no tienen listado
+  (`/api/profile` → `501`), no hay transcripción, y el mint de FSave se pide en
+  cada invocación con un cooldown del servicio (~10 s) si el payload se repite.
+  El `fileUrl` final vive ≥10 min, pero se resuelve justo antes de descargar.
+* En Instagram están las **publicaciones sueltas** (fuente primaria IGExport:
+  `reel`, `reels`, `p`, con prefijo de usuario o query; si IGExport falla, el
+  respaldo **LoveInsta** resuelve con un solo `POST /proxy.php`): los
+  **perfiles** no tienen
+  listado (`/api/profile` → `501`), no hay historias ni transcripción, y cada
+  vídeo se ofrece en **una sola calidad** (el servicio no expone calidades
+  múltiples; el respaldo sí etiqueta la resolución del job, `1080p`/`720p`).
+  El MP4 del CDN va firmado y caduca en ~2 días, el título depende
+  del oEmbed público de Instagram (best-effort con fallback al autor) y el
+  servicio puede devolver `429/503` cuando Instagram limita su tasa
+  (reintentable con backoff); LoveInsta entrega fotos con token firmado que
+  conviene consumir al momento.
+* En X (Twitter) están los **tweets sueltos** (vía iLoveX: `x.com` y
+  `twitter.com`): los **perfiles** no tienen listado (`/api/profile` → `501`),
+  los enlaces `t.co` no clasifican (`400`), no hay transcripción, y cada vídeo
+  se ofrece en **una sola calidad** (el servicio no expone calidades múltiples;
+  el trabajo de render se resuelve con `source=ilovex` en `/api/render`). Las
+  fotos sólo se descargan si su host supera la allowlist, y los estados
+  privados o eliminados devuelven un error claro (`UnavailableError`).
+* En Threads están las **publicaciones sueltas** (vía SaveThreads: `threads.com`
+  y `threads.net`): los **perfiles** no tienen listado (`/api/profile` →
+  `501`), no hay transcripción, y cada vídeo se ofrece en **una sola calidad**
+  (la máxima que entrega Threads, p. ej. 720p; el trabajo de render se resuelve
+  con `source=savethreads` en `/api/render`). El carrusel se muestra elemento a
+  elemento (vídeos y fotos); los tokens de las fotos y del `fileUrl` caducan
+  (~2 h según la FAQ del servicio), así que se resuelven y consumen al momento.
+* Se soportan **TikTok**, **YouTube**, **Facebook**, **Instagram**, **X
+  (Twitter)** y **Threads**. La ruta `/transcript/*` existe en la
+  navegación pero muestra «Próximamente»: no hay ninguna fuente comprobada
+  de transcripciones y no se inventan endpoints.
 * No hay base de datos, usuarios ni cuentas.
 * No se puede comprobar que el archivo exista realmente: se confía en el
   historial, con el botón de borrarlo como escape.
@@ -664,10 +1016,14 @@ Notas:
 3. Lote por perfil + reanudación            ✓
 4. Paginación por cursor + historial        ✓
 5. Destino por perfil + carpeta elegida     ✓
-6. Portada + rutas /download/* y /transcript/*  ✓ (TikTok y YouTube activos)
-7. Otras plataformas (FB, IG, X…)           ·
+6. Portada + rutas /download/* y /transcript/*  ✓ (TikTok, YouTube, Facebook, Instagram, X y Threads activos)
+7. Otras plataformas (FB ✓, IG ✓, X ✓, Threads ✓)             ·
    YouTube: vídeo suelto ✓ · calidades altas con audio ✓ · listas ✓
-   faltan canales y transcripción
+   Facebook: vídeo suelto ✓ (FSave) · faltan páginas y transcripción
+    Instagram: publicación suelta ✓ (IGExport + respaldo LoveInsta) · faltan perfiles e historias
+    X (Twitter): tweet suelto ✓ (iLoveX) · faltan perfiles y múltiples calidades
+    Threads: publicación suelta ✓ (SaveThreads) · faltan perfiles y múltiples calidades
+   faltan canales de YouTube y transcripción
 8. Transcripción                            · (sin fuente comprobada)
 9. Proveedor reutilizable en Laravel        ·
 ```

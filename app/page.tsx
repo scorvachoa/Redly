@@ -103,7 +103,7 @@ export default function WelcomePage() {
           <div className="hero__glow" aria-hidden="true" />
           <div className="hero__badge">
             <span className="hero__badge-dot" />
-            TikTok y YouTube disponibles · resto pronto
+            TikTok, YouTube, Facebook e Instagram disponibles · resto pronto
           </div>
           <h1 className="hero__title">
             Descarga y transcribe

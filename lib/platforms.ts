@@ -4,11 +4,14 @@
  * Es la **fuente única** para la portada y las rutas `/download/[platform]`
  * y `/transcript/[platform]`.
  *
- * **Importante**: hoy sólo TikTok y YouTube están verificados y son
- * funcionales. Las demás plataformas existen en la estructura de navegación
- * con estado «Próximamente», pero **no** se les asigna ningún endpoint: no se
- * inventan APIs sin comprobar, y ni SavTikPro ni TikVid tienen nada comprobado
- * para Facebook, Instagram, X ni Threads.
+ * **Importante**: TikTok, YouTube, Facebook, Instagram, X (Twitter) y Threads
+ * están verificados y son funcionales. Las demás plataformas existen en la
+ * estructura de navegación con estado «Próximamente», pero **no** se les
+ * asigna ningún endpoint: no se inventan APIs sin comprobar. Facebook se
+ * sirve con FSave (`lib/fsave.ts`), Instagram con IGExport (`lib/igexport.ts`)
+ * y LoveInsta de respaldo (`lib/loveinsta.ts`), X con iLoveX (`lib/ilovex.ts`)
+ * y Threads con SaveThreads (`lib/savethreads.ts`), sólo para publicaciones
+ * sueltas: sin listados de páginas.
  *
  * Módulo sin imports: lo usan la portada (servidor) y las páginas de cliente.
  */
@@ -24,9 +27,9 @@ export interface Platform {
   monogram: string;
   /** Color de la ficha de la tarjeta (icono y borde). */
   accent: string;
-  /** ¿Existe implementación real de descarga? TikTok y YouTube. */
+  /** ¿Existe implementación real de descarga? TikTok, YouTube, Facebook, Instagram, X, Threads. */
   ready: boolean;
-  /** ¿Existe descarga por lotes de un perfil/canal completo? Sólo TikTok. */
+  /** ¿Existe descarga por lotes de un perfil/canal completo? Sólo TikTok y YouTube. */
   profilesReady: boolean;
   /** ¿Existe implementación real de transcripción? Ninguna hoy. */
   transcriptReady: boolean;
@@ -64,7 +67,7 @@ export const PLATFORMS: readonly Platform[] = [
     name: "Facebook",
     monogram: "FB",
     accent: "#1877f2",
-    ready: false,
+    ready: true,
     profilesReady: false,
     transcriptReady: false,
     blurb: "Publicaciones y Reels de Facebook.",
@@ -75,10 +78,10 @@ export const PLATFORMS: readonly Platform[] = [
     name: "Instagram",
     monogram: "IG",
     accent: "#e1306c",
-    ready: false,
+    ready: true,
     profilesReady: false,
     transcriptReady: false,
-    blurb: "Reels, vídeos e historias públicas.",
+    blurb: "Reels, vídeos y fotos de publicaciones públicas.",
     hosts: ["instagram.com", "instagr.am"],
   },
   {
@@ -86,10 +89,10 @@ export const PLATFORMS: readonly Platform[] = [
     name: "X (Twitter)",
     monogram: "X",
     accent: "#0f1419",
-    ready: false,
+    ready: true,
     profilesReady: false,
     transcriptReady: false,
-    blurb: "Vídeos incrustados en publicaciones de X.",
+    blurb: "Vídeos y fotos de tweets públicos.",
     hosts: ["twitter.com", "x.com", "t.co"],
   },
   {
@@ -97,11 +100,11 @@ export const PLATFORMS: readonly Platform[] = [
     name: "Threads",
     monogram: "TH",
     accent: "#101010",
-    ready: false,
+    ready: true,
     profilesReady: false,
     transcriptReady: false,
-    blurb: "Publicaciones con vídeo de Threads.",
-    hosts: ["threads.net", "www.threads.net"],
+    blurb: "Vídeos y fotos de publicaciones públicas de Threads.",
+    hosts: ["threads.com", "threads.net"],
   },
 ] as const;
 

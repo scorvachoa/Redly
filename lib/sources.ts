@@ -17,6 +17,10 @@ import { PLATFORMS, type Platform } from "./platforms";
 import { RequestError } from "./exceptions";
 import { SavetikSource, searchAny, type ProfilePage } from "./savetik";
 import { SnapYTSource } from "./snapyt";
+import { FsaveSource } from "./fsave";
+import { IgexportSource, searchAny as searchInstagramAny } from "./igexport";
+import { IlovexSource } from "./ilovex";
+import { SavethreadsSource } from "./savethreads";
 
 /**
  * Contrato mínimo que debe cumplir cualquier fuente.
@@ -82,6 +86,36 @@ export class TikTokSource implements ContentSource {
 }
 
 /**
+ * Fachada de Instagram: una sola publicación con fallback (IGExport →
+ * LoveInsta) y el listado de perfiles delegado en `IgexportSource` (ninguna
+ * de las dos fuentes lo soporta: la ruta responde 501 sin llamar).
+ *
+ * Envuelve la pareja de módulos para que las rutas puedan decir
+ * `source.searchVideo(url)` sin conocer `searchAny` ni a ningún proveedor.
+ */
+export class InstagramSource implements ContentSource {
+  readonly id = "instagram";
+  readonly platforms = ["instagram"] as const;
+  readonly supportsProfiles = false;
+
+  /** Instancia compartida: reutiliza la conexión HTTP entre invocaciones. */
+  private readonly igexport = new IgexportSource();
+
+  searchVideo(url: string): Promise<TikTokResult> {
+    return searchInstagramAny(url, { igexport: this.igexport });
+  }
+
+  listProfilePage(
+    url: string,
+    cursor?: string | null,
+    page?: number,
+    limit?: number,
+  ): Promise<ProfilePage> {
+    return this.igexport.listProfilePage(url, cursor, page, limit);
+  }
+}
+
+/**
  * Instancias de las fuentes verificadas, en orden de preferencia.
  *
  * Se crean una sola vez por módulo: compartir el cliente entre invocaciones
@@ -90,8 +124,19 @@ export class TikTokSource implements ContentSource {
  *
  * YouTube se sirve con una única fuente (SnapYT), sin cadena de respaldo:
  * YTDown e Invidious se retiraron tras comprobar que no servían desde backend.
+ * Facebook se sirve con FSave; Instagram encadena IGExport con LoveInsta de
+ * respaldo (publicación suelta; sin listados de páginas en ninguno de los
+ * cuatro casos de publicaciones sueltas), X (Twitter) con iLoveX y Threads
+ * con SaveThreads (publicación suelta: vídeo o fotos del carrusel).
  */
-const SOURCES: readonly ContentSource[] = [new TikTokSource(), new SnapYTSource()];
+const SOURCES: readonly ContentSource[] = [
+  new TikTokSource(),
+  new SnapYTSource(),
+  new FsaveSource(),
+  new InstagramSource(),
+  new IlovexSource(),
+  new SavethreadsSource(),
+];
 
 /** Devuelve todas las fuentes registradas (orden de preferencia). */
 export function allSources(): readonly ContentSource[] {

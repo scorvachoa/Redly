@@ -12,10 +12,34 @@
  */
 
 import {
+  inputToFacebookUrl,
+  isFacebookProfileUrl,
+  isFacebookUrl,
+  isFacebookVideoUrl,
+} from "./facebook-urls";
+import {
+  inputToInstagramUrl,
+  isInstagramPostUrl,
+  isInstagramProfileUrl,
+  isInstagramUrl,
+} from "./instagram-urls";
+import {
   inputToTikTokUrl,
   isProfileUrl as isTikTokProfileUrl,
   isTikTokUrl,
 } from "./urls";
+import {
+  inputToThreadsUrl,
+  isThreadsPostUrl,
+  isThreadsProfileUrl,
+  isThreadsUrl,
+} from "./threads-urls";
+import {
+  inputToTwitterUrl,
+  isTweetUrl,
+  isTwitterProfileUrl,
+  isTwitterUrl,
+} from "./twitter-urls";
 import {
   inputToYouTubeUrl,
   isYouTubePlaylistUrl,
@@ -63,13 +87,75 @@ const YOUTUBE_RULES: UrlRules = {
   },
 };
 
+const FACEBOOK_RULES: UrlRules = {
+  slug: "facebook",
+  matches: isFacebookUrl,
+  normalize: inputToFacebookUrl,
+  classify(url) {
+    // Sólo se resuelven vídeos/reels concretos; las páginas de Facebook no
+    // tienen listado (`supportsProfiles: false` en la fuente).
+    if (isFacebookVideoUrl(url)) return "video";
+    if (isFacebookProfileUrl(url)) return "profile";
+    return "unsupported";
+  },
+};
+
+const INSTAGRAM_RULES: UrlRules = {
+  slug: "instagram",
+  matches: isInstagramUrl,
+  normalize: inputToInstagramUrl,
+  classify(url) {
+    // Reels, `/p/` con vídeo y publicaciones de fotos entran por el mismo
+    // flujo (la fuente cae a `/api/ig-photo/` si no hay vídeo); los perfiles
+    // no tienen listado (`supportsProfiles: false` en la fuente).
+    if (isInstagramPostUrl(url)) return "video";
+    if (isInstagramProfileUrl(url)) return "profile";
+    return "unsupported";
+  },
+};
+
+const TWITTER_RULES: UrlRules = {
+  slug: "twitter",
+  matches: isTwitterUrl,
+  normalize: inputToTwitterUrl,
+  classify(url) {
+    // Sólo se resuelven tweets concretos; los perfiles de X no tienen listado
+    // (`supportsProfiles: false` en la fuente). Los enlaces cortos `t.co` no
+    // casan con las reglas (pueden apuntar a cualquier cosa): la ruta
+    // responde 400 sin inventar un destino.
+    if (isTweetUrl(url)) return "video";
+    if (isTwitterProfileUrl(url)) return "profile";
+    return "unsupported";
+  },
+};
+
+const THREADS_RULES: UrlRules = {
+  slug: "threads",
+  matches: isThreadsUrl,
+  normalize: inputToThreadsUrl,
+  classify(url) {
+    // Sólo se resuelven publicaciones concretas (`/@usuario/post/<código>`);
+    // los perfiles no tienen listado (`supportsProfiles: false` en la fuente).
+    if (isThreadsPostUrl(url)) return "video";
+    if (isThreadsProfileUrl(url)) return "profile";
+    return "unsupported";
+  },
+};
+
 /**
  * Registro de reglas, en orden de preferencia.
  *
  * Sólo entran plataformas con reglas verificadas; las demás siguen existiendo
  * en `lib/platforms.ts` y ninguna URL les casa (la entrada cae en `null`).
  */
-export const URL_RULES: readonly UrlRules[] = [TIKTOK_RULES, YOUTUBE_RULES];
+export const URL_RULES: readonly UrlRules[] = [
+  TIKTOK_RULES,
+  YOUTUBE_RULES,
+  FACEBOOK_RULES,
+  INSTAGRAM_RULES,
+  TWITTER_RULES,
+  THREADS_RULES,
+];
 
 export interface ClassifiedUrl {
   slug: string;

@@ -3,10 +3,17 @@ import { describe, expect, it } from "vitest";
 import { PLATFORMS, getPlatform, isReady } from "@/lib/platforms";
 
 describe("registro de plataformas", () => {
-  it("sólo TikTok y YouTube están disponibles para descarga", () => {
+  it("TikTok, YouTube, Facebook, Instagram, X y Threads están disponibles para descarga", () => {
     const ready = PLATFORMS.filter((platform) => platform.ready);
 
-    expect(ready.map((platform) => platform.slug)).toEqual(["tiktok", "youtube"]);
+    expect(ready.map((platform) => platform.slug)).toEqual([
+      "tiktok",
+      "youtube",
+      "facebook",
+      "instagram",
+      "twitter",
+      "threads",
+    ]);
   });
 
   it("TikTok y YouTube tienen listado por perfil/lista", () => {
@@ -53,6 +60,13 @@ describe("isReady", () => {
     expect(isReady(tiktok, "transcript")).toBe(false);
     expect(isReady(youtube, "download")).toBe(true);
     expect(isReady(youtube, "transcript")).toBe(false);
-    expect(isReady(getPlatform("facebook")!, "download")).toBe(false);
+    expect(isReady(getPlatform("facebook")!, "download")).toBe(true);
+    expect(isReady(getPlatform("facebook")!, "transcript")).toBe(false);
+    expect(isReady(getPlatform("instagram")!, "download")).toBe(true);
+    expect(isReady(getPlatform("instagram")!, "transcript")).toBe(false);
+    expect(isReady(getPlatform("twitter")!, "download")).toBe(true);
+    expect(isReady(getPlatform("twitter")!, "transcript")).toBe(false);
+    expect(isReady(getPlatform("threads")!, "download")).toBe(true);
+    expect(isReady(getPlatform("threads")!, "transcript")).toBe(false);
   });
 });
