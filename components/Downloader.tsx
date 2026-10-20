@@ -16,7 +16,7 @@
  * de la función serverless.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import PlatformIcon from "@/components/PlatformIcon";
 import ProgressBar, { IDLE_PROGRESS, type ProgressState } from "@/components/downloader/ProgressBar";
@@ -192,6 +192,8 @@ export default function Downloader({ platform }: { platform: Platform }) {
   const [progress, setProgress] = useState<ProgressState>(IDLE_PROGRESS);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Evita repetir el arranque con `?url=` si el efecto vuelve a ejecutarse. */
+  const pickedIncomingUrl = useRef(false);
   const history = useDownloadHistory();
 
   /** Subcarpeta del perfil en curso; `null` en modo vídeo (se escribe directo). */
@@ -326,8 +328,15 @@ export default function Downloader({ platform }: { platform: Platform }) {
     [history],
   );
 
-  const analyze = useCallback(async () => {
-    const classified = classifyInput(url);
+  /**
+   * Analiza la URL del campo, o la que se pase en `override`.
+   *
+   * El override existe para el arranque con `?url=` (viene de la portada):
+   * el parámetro se lee al montar, cuando el `setUrl` posterior todavía no ha
+   * actualizado el estado del que depende este callback.
+   */
+  const analyze = useCallback(async (override?: string) => {
+    const classified = classifyInput(override ?? url);
     if (!classified) {
       setStatus({ kind: "error", text: `Introduce una URL de ${platform.name}.` });
       inputRef.current?.focus();
@@ -414,6 +423,29 @@ export default function Downloader({ platform }: { platform: Platform }) {
       setBusy(false);
     }
   }, [url, reset, profileWanted, listProfile, platform]);
+
+  /**
+   * Arranque con una URL venida de fuera: la portada manda
+   * `/download/<plataforma>?url=<enlace>` y aquí se rellena el campo y se
+   * analiza solo.
+   *
+   * El parámetro se lee de `window.location` y no de `useSearchParams` a
+   * propósito: la página es estática (`generateStaticParams`) y ese hook
+   * exigiría un `<Suspense>` que dejaría el descargador fuera del HTML
+   * prerenderizado. Consumido, se borra de la barra para que un refresco no
+   * vuelva a analizar la misma URL.
+   */
+  useEffect(() => {
+    if (pickedIncomingUrl.current) return;
+    pickedIncomingUrl.current = true;
+
+    const incoming = new URLSearchParams(window.location.search).get("url")?.trim();
+    if (!incoming) return;
+
+    setUrl(incoming);
+    window.history.replaceState(null, "", window.location.pathname);
+    void analyze(incoming);
+  }, [analyze]);
 
   // --- Descargas --------------------------------------------------------
 
@@ -865,7 +897,7 @@ export default function Downloader({ platform }: { platform: Platform }) {
                 <>
                   Acepta la URL de un <b>vídeo</b> o la de una{" "}
                   <b>{isPlaylistPlatform ? "lista de reproducción" : "perfil"}</b>
-                  {isPlaylistPlatform ? "" : " (<code>@usuario</code>)"}.
+                  {isPlaylistPlatform ? "" : <> (<code>@usuario</code>)</>}.
                 </>
               ) : (
                 <>

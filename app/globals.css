@@ -111,6 +111,12 @@ a {
    Todas las páginas comparten el mismo ancho: 1080px. */
 .header {
   @apply sticky top-0 z-10 border-b border-line bg-surface transition-colors;
+  /* Los menús desplegables son `position: absolute`: en móviles de 360px o
+     menos el de «Transcribir» se salía del viewport y la página entera
+     scrolleaba en horizontal, dejando un hueco vacío a la derecha. `clip`
+     corta ese sobrante sin abrir un contenedor de scroll, como haría
+     `overflow-x: hidden`. */
+  overflow-x: clip;
 }
 
 .header__inner {
@@ -350,6 +356,13 @@ a {
 
 .btn:disabled {
   @apply cursor-not-allowed opacity-[0.55];
+}
+
+/* Los iconos no se encogen: en botones estrechos («Descargar para Windows»
+   a 320px) el flex se comía los 16px del icono y desaparecía. Si no cabe
+   sitio, que envuelva el texto —ver `@media (max-width: 400px)`—. */
+.btn svg {
+  flex-shrink: 0;
 }
 
 .btn--primary {
@@ -838,15 +851,6 @@ a {
   opacity: 0.9;
 }
 
-.hero__badge {
-  @apply mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface py-[5px] pr-3 pl-2.5 text-xs font-semibold text-muted;
-}
-
-.hero__badge-dot {
-  @apply h-[7px] w-[7px] rounded-full bg-ok;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
-}
-
 .hero__title {
   @apply mb-[18px] text-[clamp(32px,6.2vw,52px)] font-bold leading-[1.08] tracking-[-0.035em];
 }
@@ -880,6 +884,65 @@ a {
 
 .hero__stats-sep {
   @apply h-1 w-1 rounded-full bg-line;
+}
+
+/* --------------------------------------------------------------------------
+   Buscador general de la portada
+   -------------------------------------------------------------------------- */
+/* Es la pieza principal del hero: tarjeta propia con el borde teñido de
+   acento, para que se lea como «lo que hay que usar» sin depender del color
+   de un botón concreto. */
+.hero__search {
+  @apply mb-[26px] rounded-card border bg-surface p-4 shadow-card;
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* `min-width: 0`: como hijo flex, el campo no puede quedarse con su ancho
+   mínimo de contenido y empujar el botón fuera de la tarjeta. */
+.hero__search .input {
+  min-width: 0;
+}
+
+/* El error de envío respira igual que el chip, no como el `.status` suelto. */
+.hero__search .status {
+  @apply mt-3;
+}
+
+/* Chip de detección: una línea de altura fija para que el layout no salte
+   entre «escribiendo» y «reconocido». */
+.hero__detect {
+  @apply mt-3 flex min-h-[20px] items-center gap-2 text-[13px] text-muted;
+}
+
+.hero__detect--ok {
+  @apply text-ok;
+}
+
+.hero__detect--error {
+  @apply text-danger;
+}
+
+/* Icono de la red detectada: mismo ladrillo de color que en la navegación
+   (`--tile` lo aporta la plataforma), con un estado de error aparte que no
+   lleva color de marca. */
+.hero__detect-icon {
+  @apply grid h-[20px] w-[20px] shrink-0 place-items-center rounded-[7px] text-white;
+  background: var(--tile, var(--accent));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.hero__detect-icon--error {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+  color: var(--error);
+  box-shadow: none;
+}
+
+.hero__detect-check {
+  @apply ml-auto shrink-0 text-ok;
+}
+
+.hero__detect-check--warn {
+  @apply text-accent;
 }
 
 /* --------------------------------------------------------------------------
@@ -1229,6 +1292,35 @@ a {
 @media (max-width: 560px) {
   .platform-grid {
     @apply grid-cols-1;
+  }
+  .hero__actions-main {
+    @apply w-full flex-col;
+  }
+  .hero__actions-main .btn {
+    @apply w-full;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Móvil estrecho (320-400px: iPhone SE, Android de 360px, Galaxy Fold)
+   -------------------------------------------------------------------------- */
+/* Dos problemas medidos a 320/360px, invisibles en anchos mayores:
+   1. Los menús se anclaban a su gatillo; el de «Transcribir» empieza ~115px
+      a la derecha y con `min-w-[252px]` acababa en 367px, así que la página
+      scrolleaba en horizontal (a 360px, 7px de hueco; a 320px, 47px).
+      Anclados al borde de la navegación caben: 24 + 252 = 276 < 320.
+   2. «Descargar para Windows» no cabía en su botón a todo ancho: el flex
+      encogía el icono a 0px y el texto se salía del borde. Con envoltura
+      libre entran las dos líneas. (El icono ya no encoge por `.btn svg`.) */
+@media (max-width: 400px) {
+  .nav {
+    position: relative;
+  }
+  .nav__item {
+    position: static;
+  }
+  .btn {
+    white-space: normal;
   }
 }
 

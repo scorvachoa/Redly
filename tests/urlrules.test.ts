@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyInput, URL_RULES } from "@/lib/urlrules";
+import { classifyInput, resolveSearchInput, URL_RULES } from "@/lib/urlrules";
 
 const ID = "dQw4w9WgXcQ";
 
@@ -245,5 +245,78 @@ describe("classifyInput", () => {
     expect(classifyInput("   ")).toBeNull();
     expect(classifyInput(null)).toBeNull();
     expect(classifyInput(undefined)).toBeNull();
+  });
+});
+
+describe("resolveSearchInput", () => {
+  it("resuelve un vídeo de cada red con su slug y la URL normalizada", () => {
+    const urls = [
+      "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+      `https://www.youtube.com/watch?v=${ID}`,
+      "https://www.facebook.com/reel/10153231379946729",
+      "https://www.instagram.com/reel/DeMbuYlBfMk/",
+      "https://x.com/SpaceX/status/2109957980011552839",
+      "https://www.threads.com/@user/post/AbC123_xYz",
+    ];
+    for (const url of urls) {
+      const resolution = resolveSearchInput(`  ${url}  `);
+      expect(resolution.ok).toBe(true);
+      if (!resolution.ok) continue;
+      expect(resolution.kind).toBe("video");
+      expect(resolution.url).toBe(url);
+    }
+  });
+
+  it("resuelve el @usuario de TikTok hacia su URL completa", () => {
+    const resolution = resolveSearchInput("@scout2015");
+
+    expect(resolution).toEqual({
+      ok: true,
+      slug: "tiktok",
+      url: "https://www.tiktok.com/@scout2015",
+      kind: "profile",
+    });
+  });
+
+  it("admite el canal de YouTube, que sí tiene listado", () => {
+    const resolution = resolveSearchInput("https://www.youtube.com/@rickastley");
+
+    expect(resolution.ok).toBe(true);
+    if (resolution.ok) expect(resolution.slug).toBe("youtube");
+  });
+
+  it("rechaza los perfiles de las redes que aún no listan", () => {
+    for (const url of [
+      "https://www.facebook.com/NASA",
+      "https://www.instagram.com/nasa/?hl=en",
+      "https://x.com/SpaceX",
+      "https://www.threads.com/@mileycyrus",
+    ]) {
+      const resolution = resolveSearchInput(url);
+      expect(resolution.ok).toBe(false);
+      if (!resolution.ok) expect(resolution.error).toMatch(/aún no están disponibles/);
+    }
+  });
+
+  it("rechaza las URLs que no apuntan a un vídeo concreto", () => {
+    const resolution = resolveSearchInput("https://www.youtube.com/results?search_query=cats");
+
+    expect(resolution.ok).toBe(false);
+    if (!resolution.ok) expect(resolution.error).toMatch(/no corresponde a un vídeo concreto/);
+  });
+
+  it("rechaza lo que ninguna regla reconoce", () => {
+    const resolution = resolveSearchInput("https://example.com/video/1");
+
+    expect(resolution.ok).toBe(false);
+    if (!resolution.ok) expect(resolution.error).toMatch(/No reconozco esa URL/);
+  });
+
+  it("rechaza la entrada vacía", () => {
+    for (const input of ["", "   ", null, undefined]) {
+      const resolution = resolveSearchInput(input);
+      expect(resolution.ok).toBe(false);
+      if (!resolution.ok) expect(resolution.error).toMatch(/Pega la URL/);
+    }
   });
 });

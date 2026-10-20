@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import HomeSearch from "@/components/HomeSearch";
 import InstallApp from "@/components/InstallApp";
 import PlatformIcon from "@/components/PlatformIcon";
 import SiteFooter from "@/components/SiteFooter";
@@ -101,10 +102,6 @@ export default function WelcomePage() {
       <main className="main">
         <section className="hero">
           <div className="hero__glow" aria-hidden="true" />
-          <div className="hero__badge">
-            <span className="hero__badge-dot" />
-            TikTok, YouTube, Facebook e Instagram disponibles · resto pronto
-          </div>
           <h1 className="hero__title">
             Descarga y transcribe
             <br />
@@ -114,12 +111,15 @@ export default function WelcomePage() {
             Red.ly analiza una URL, resuelve el archivo en el CDN y te lo guarda donde elijas.
             Funciona en el navegador, con historial local para no repetir descargas.
           </p>
+
+          <HomeSearch />
+
           <div className="hero__actions">
             <div className="hero__actions-main">
-              <a href="#obtener-programa" className="btn btn--primary btn--lg">
+              <a href="#obtener-programa" className="btn btn--ghost btn--sm">
                 Obtener programa
               </a>
-              <a href="#plataformas" className="btn btn--ghost btn--lg">
+              <a href="#plataformas" className="btn btn--ghost btn--sm">
                 Ver plataformas
               </a>
             </div>

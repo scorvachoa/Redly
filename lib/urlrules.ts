@@ -7,10 +7,12 @@
  * módulo concentra la clasificación en un registro equivalente al de
  * `lib/sources.ts`: la ruta resuelve las reglas por la URL y sólo delega.
  *
- * Apt navegador: lo usan las rutas (servidor) y `components/Downloader.tsx`
- * para decidir el flujo sin una ida y vuelta a la API.
+ * Apt navegador: lo usan las rutas (servidor), `components/Downloader.tsx`
+ * para decidir el flujo sin una ida y vuelta a la API y
+ * `components/HomeSearch.tsx` (buscador general de la portada).
  */
 
+import { getPlatform } from "./platforms";
 import {
   inputToFacebookUrl,
   isFacebookProfileUrl,
@@ -180,4 +182,52 @@ export function classifyInput(input: string | null | undefined): ClassifiedUrl |
     return { slug: rules.slug, rules, url, kind: rules.classify(url) };
   }
   return null;
+}
+
+/**
+ * Resultado de resolver la entrada del buscador general de la portada.
+ *
+ * `ok: true` lleva la URL ya normalizada y el slug al que hay que navegar;
+ * `ok: false` lleva el mensaje que se muestra bajo el campo. Los textos son
+ * copy de interfaz y replican el de `components/Downloader.tsx`, para que
+ * llegar desde la portada o escribir en la página de la plataforma diga lo
+ * mismo.
+ */
+export type SearchResolution =
+  | { ok: true; slug: string; url: string; kind: UrlKind }
+  | { ok: false; error: string };
+
+/**
+ * Decide a qué página lleva una entrada del buscador general.
+ *
+ * El buscador no sabe de plataformas: clasifica con las mismas reglas que la
+ * API y el descargador, comprueba que la destino esté disponible y devuelve
+ * tanto el destino (`/download/<slug>?url=…`) como el motivo si no procede
+ * navegar. Sólo se admite descarga (`kind` vídeo/perfil): la transcripción
+ * todavía no tiene ninguna fuente.
+ */
+export function resolveSearchInput(input: string | null | undefined): SearchResolution {
+  const raw = (input ?? "").trim();
+  if (!raw) return { ok: false, error: "Pega la URL de un vídeo o de un perfil público." };
+
+  const classified = classifyInput(raw);
+  if (!classified) {
+    return {
+      ok: false,
+      error: "No reconozco esa URL. Prueba con un enlace de TikTok, YouTube, Facebook, Instagram, X o Threads.",
+    };
+  }
+
+  const platform = getPlatform(classified.slug);
+  if (!platform || !platform.ready) {
+    return { ok: false, error: `${platform?.name ?? "Esa plataforma"} aún no está disponible.` };
+  }
+  if (classified.kind === "profile" && platform.profilesReady !== true) {
+    return { ok: false, error: `Los canales de ${platform.name} aún no están disponibles.` };
+  }
+  if (classified.kind === "unsupported") {
+    return { ok: false, error: `Esa URL de ${platform.name} no corresponde a un vídeo concreto.` };
+  }
+
+  return { ok: true, slug: classified.slug, url: classified.url, kind: classified.kind };
 }
