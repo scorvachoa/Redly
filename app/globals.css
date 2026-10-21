@@ -111,16 +111,19 @@ a {
    Todas las páginas comparten el mismo ancho: 1080px. */
 .header {
   @apply sticky top-0 z-10 border-b border-line bg-surface transition-colors;
-  /* Los menús desplegables son `position: absolute`: en móviles de 360px o
-     menos el de «Transcribir» se salía del viewport y la página entera
-     scrolleaba en horizontal, dejando un hueco vacío a la derecha. `clip`
-     corta ese sobrante sin abrir un contenedor de scroll, como haría
+  /* Recorta cualquier desbordamiento horizontal de la cabecera (p. ej. la
+     navegación en 320px) sin abrir un contenedor de scroll, como haría
      `overflow-x: hidden`. */
   overflow-x: clip;
 }
 
 .header__inner {
   @apply mx-auto flex min-h-[62px] w-full max-w-[1080px] items-center justify-between gap-4 px-6;
+}
+
+/* Grupo de la derecha: enlaces legales, GitHub y botón de tema. */
+.header__side {
+  @apply flex items-center gap-1.5;
 }
 
 .brand__name {
@@ -138,113 +141,19 @@ a {
   @apply flex items-center gap-0.5;
 }
 
-.nav__item {
-  @apply relative;
-}
-
 /* `cursor-pointer` porque en Tailwind v4 el Preflight deja los `<button>` con
-   `cursor: default`. Los disparadores son botones y no enlaces: al pulsarlos
-   sólo se despliega el menú, no se navega. */
+   `cursor: default`. */
 .nav__trigger {
   @apply inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-ctl px-3 py-2 text-[13.5px] font-semibold text-muted no-underline transition-colors;
 }
 
-.nav__trigger:hover,
-.nav__item:focus-within > .nav__trigger {
+.nav__trigger:hover {
   @apply bg-hover text-ink;
 }
 
-.nav__caret {
-  width: 0;
-  height: 0;
-  border-left: 3.5px solid transparent;
-  border-right: 3.5px solid transparent;
-  border-top: 4px solid currentColor;
-  opacity: 0.55;
-}
-
-/* Se anima sólo la opacidad. Un `translateY` desplazaría también el puente de
-   arriba y dejaría un hueco de 4px sin cubrir mientras dura la animación. */
-.nav__menu {
-  @apply invisible absolute left-0 top-full z-30 mt-2 min-w-[252px] rounded-card border border-line bg-surface p-1.5 opacity-0 shadow-card;
-  transition:
-    opacity 140ms ease,
-    visibility 140ms;
-  pointer-events: none;
-}
-
-/* Puente invisible sobre el `mt-2` del menú. Sin él, al bajar el ratón desde
-   el disparador se cruza un hueco donde no hay nada bajo el puntero, `:hover`
-   se pierde un instante y el menú se cierra antes de llegar a los enlaces.
-   Hereda `pointer-events` y `visibility` del menú, así que sólo está activo
-   cuando el menú está abierto. */
-.nav__menu::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -12px;
-  height: 12px;
-}
-
-.nav__item:hover .nav__menu,
-.nav__item:focus-within .nav__menu {
-  @apply visible opacity-100;
-  pointer-events: auto;
-}
-
-.nav__group {
-  @apply px-2.5 pt-1 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-muted;
-}
-
-.nav__link {
-  @apply flex items-center gap-2.5 rounded-ctl px-2.5 py-[7px] text-[13.5px] text-ink no-underline transition-colors;
-}
-
-.nav__link:hover {
-  @apply bg-hover;
-}
-
-.nav__link:hover .nav__link-name {
-  @apply text-accent;
-}
-
-.nav__link-icon {
-  @apply grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] text-white;
-  background: var(--tile, var(--accent));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-
-.nav__link-name {
-  @apply flex-1 font-medium;
-}
-
-.nav__link--muted {
-  @apply text-muted;
-}
-
-.nav__link--muted .nav__link-icon {
-  opacity: 0.5;
-}
-
-.nav__link--muted .nav__link-name {
-  @apply font-normal;
-}
-
-.nav__link--muted:hover .nav__link-name {
-  @apply text-ink;
-}
-
-.nav__link-ready {
-  @apply rounded-full border border-accent/30 px-2 py-px text-[10px] font-bold uppercase tracking-[0.05em] text-accent;
-}
-
-.nav__link-soon {
-  @apply text-[11px] text-placeholder;
-}
-
-.nav__link:hover .nav__link-soon {
-  @apply text-muted;
+/* Disparador que sólo lleva icono (GitHub en la cabecera). */
+.nav__trigger--icon {
+  @apply px-2.5;
 }
 
 .main {
@@ -255,43 +164,15 @@ a {
    Pie
    -------------------------------------------------------------------------- */
 .site-footer {
-  @apply mt-14 border-t border-line bg-surface py-10;
+  @apply mt-14 border-t border-line bg-surface py-8;
 }
 
 .site-footer__inner {
-  @apply mx-auto flex w-full max-w-[1080px] flex-wrap justify-between gap-x-10 gap-y-9 px-6;
+  @apply mx-auto flex w-full max-w-[1080px] flex-col gap-3 px-6;
 }
 
-.site-footer__brand {
-  @apply max-w-[32ch];
-}
-
-.site-footer__tag {
-  @apply mt-2.5 text-[13px] leading-[1.6] text-muted;
-}
-
-.site-footer__cols {
-  @apply flex flex-wrap gap-x-10 gap-y-8;
-}
-
-.site-footer__col {
-  @apply flex min-w-[112px] flex-col gap-2;
-}
-
-.site-footer__title {
-  @apply mb-0.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-muted;
-}
-
-.site-footer__link {
-  @apply text-[13.5px] text-ink no-underline transition-colors;
-}
-
-.site-footer__link:hover {
-  @apply text-accent;
-}
-
-.site-footer__legal {
-  @apply mx-auto mt-9 w-full max-w-[1080px] border-t border-line px-6 pt-6 text-[12px] leading-[1.6] text-muted;
+.site-footer__text {
+  @apply max-w-[80ch] text-[12.5px] leading-[1.6] text-muted;
 }
 
 /* --------------------------------------------------------------------------
@@ -358,9 +239,9 @@ a {
   @apply cursor-not-allowed opacity-[0.55];
 }
 
-/* Los iconos no se encogen: en botones estrechos («Descargar para Windows»
-   a 320px) el flex se comía los 16px del icono y desaparecía. Si no cabe
-   sitio, que envuelva el texto —ver `@media (max-width: 400px)`—. */
+/* Los iconos no se encogen: en botones estrechos el flex se comería los 16px
+   del icono y desaparecía. Si no cabe sitio, que envuelva el texto —ver
+   `@media (max-width: 400px)`—. */
 .btn svg {
   flex-shrink: 0;
 }
@@ -379,10 +260,6 @@ a {
 
 .btn--ghost:hover:not(:disabled) {
   @apply bg-hover text-ink;
-}
-
-.btn--lg {
-  @apply px-5 py-[11px] text-[14.5px];
 }
 
 .btn--theme {
@@ -862,30 +739,6 @@ a {
   color: transparent;
 }
 
-.hero__text {
-  @apply mb-[26px] max-w-[60ch] text-base leading-[1.65] text-muted;
-}
-
-.hero__actions {
-  @apply mb-[26px] flex flex-wrap items-center justify-between gap-3;
-}
-
-.hero__actions-main {
-  @apply flex flex-wrap gap-3;
-}
-
-.hero__stats {
-  @apply flex flex-wrap items-center gap-3.5 text-[12.5px] text-muted;
-}
-
-.hero__stats b {
-  @apply font-bold text-ink;
-}
-
-.hero__stats-sep {
-  @apply h-1 w-1 rounded-full bg-line;
-}
-
 /* --------------------------------------------------------------------------
    Buscador general de la portada
    -------------------------------------------------------------------------- */
@@ -903,162 +756,39 @@ a {
   min-width: 0;
 }
 
-/* El error de envío respira igual que el chip, no como el `.status` suelto. */
-.hero__search .status {
-  @apply mt-3;
+/* Fila de redes soportadas bajo el buscador de la portada. Cada ladrillo
+   lleva el color de la plataforma (`--tile`); la que coincide con lo
+   detectado se resalta con borde y sombra del color de marca. */
+.hero__networks {
+  @apply mb-4 flex flex-wrap items-center gap-x-3 gap-y-2;
 }
 
-/* Chip de detección: una línea de altura fija para que el layout no salte
-   entre «escribiendo» y «reconocido». */
-.hero__detect {
-  @apply mt-3 flex min-h-[20px] items-center gap-2 text-[13px] text-muted;
+.hero__networks-label {
+  @apply text-[11.5px] font-bold tracking-[0.14em] text-muted uppercase;
 }
 
-.hero__detect--ok {
-  @apply text-ok;
+.hero__networks-row {
+  @apply m-0 flex list-none flex-wrap items-center gap-1.5 p-0;
 }
 
-.hero__detect--error {
-  @apply text-danger;
+.hero__network {
+  @apply flex items-center gap-1.5 rounded-[9px] border border-line bg-surface-2 py-1 pr-2 pl-1.5 text-[11.5px] font-semibold text-muted transition-[border-color,color,box-shadow];
 }
 
-/* Icono de la red detectada: mismo ladrillo de color que en la navegación
-   (`--tile` lo aporta la plataforma), con un estado de error aparte que no
-   lleva color de marca. */
-.hero__detect-icon {
-  @apply grid h-[20px] w-[20px] shrink-0 place-items-center rounded-[7px] text-white;
-  background: var(--tile, var(--accent));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+.hero__network svg {
+  @apply shrink-0 text-ink;
 }
 
-.hero__detect-icon--error {
-  background: color-mix(in srgb, var(--error) 14%, transparent);
-  color: var(--error);
-  box-shadow: none;
+.hero__network--active {
+  border-color: color-mix(in srgb, var(--tile, var(--accent)) 55%, var(--border));
+  color: var(--ink);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tile, var(--accent)) 25%, transparent);
 }
 
-.hero__detect-check {
-  @apply ml-auto shrink-0 text-ok;
-}
-
-.hero__detect-check--warn {
-  @apply text-accent;
-}
-
-/* --------------------------------------------------------------------------
-   Secciones de la portada
-   -------------------------------------------------------------------------- */
-.landing-section {
-  @apply mt-11;
-}
-
-.section-head {
-  @apply mb-4 flex items-start justify-between gap-4;
-}
-
-.section-head .section-title {
-  @apply mb-1 mt-0;
-}
-
-/* El lead ocupa todo lo que deja la cabecera de la sección y sólo salta de
-   línea cuando choca con el borde de esa columna. */
-.landing-section__lead {
-  @apply text-sm leading-[1.6] text-muted;
-}
-
-/* --------------------------------------------------------------------------
-   Sección «Obtener programa»
-   -------------------------------------------------------------------------- */
-.program-grid {
-  @apply grid grid-cols-2 gap-4;
-}
-
-.program-card {
-  @apply rounded-card border border-line bg-surface p-5;
-}
-
-.program-card--ready {
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-}
-
-.program-card__head {
-  @apply mb-3.5 flex items-center gap-3;
-}
-
-.program-card__icon {
-  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-ctl border border-line bg-entry text-accent;
-}
-
-.program-card__id {
-  @apply flex-1;
-}
-
-.program-card__name {
-  @apply text-[15px] font-bold text-ink;
-}
-
-.program-card__meta {
-  @apply text-[12px] text-muted;
-}
-
-.program-card__text {
-  @apply mb-4 text-[13.5px] leading-[1.65] text-muted;
-}
-
-.program-list {
-  @apply mb-4 mt-0 flex list-none flex-col gap-2.5 p-0;
-}
-
-.program-list li {
-  @apply flex items-start gap-2.5 text-[13.5px] leading-[1.55] text-ink;
-}
-
-.program-list li svg {
-  @apply mt-[3px] shrink-0 text-accent;
-}
-
-.program-card__note {
-  @apply text-[12.5px] leading-[1.6] text-placeholder;
-}
-
-/* --------------------------------------------------------------------------
-   Instalación como aplicación (PWA)
-   -------------------------------------------------------------------------- */
-.install {
-  @apply rounded-card border border-line bg-entry p-3.5;
-}
-
-.install__row {
-  @apply flex flex-wrap items-center gap-3;
-}
-
-.install__icon {
-  @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-ctl border border-line bg-surface text-accent;
-}
-
-.install__icon--ok {
-  @apply text-ok;
-}
-
-.install__text {
-  @apply min-w-0 flex-1 text-[13px] leading-[1.6] text-muted;
-}
-
-.install__text b {
-  @apply font-semibold text-ink;
-}
-
-.install__steps {
-  @apply mt-3 flex flex-col gap-1.5 pl-0 text-[13px] leading-[1.6] text-muted;
-  list-style: none;
-}
-
-.install__steps li {
-  @apply flex gap-2;
-}
-
-.install__steps b {
-  @apply shrink-0 font-semibold text-ink;
+/* El buscador de la portada es el protagonista: los resultados (panel de
+   vídeo o de perfil) se pintan justo debajo, dentro del mismo bloque. */
+.home-tool {
+  @apply mb-[26px];
 }
 
 /* --------------------------------------------------------------------------
@@ -1178,10 +908,6 @@ a {
   @apply text-[14.5px] font-semibold;
 }
 
-.platform-card__blurb {
-  @apply text-[12.5px] leading-[1.45] text-muted;
-}
-
 .pill {
   @apply shrink-0 whitespace-nowrap rounded-full border border-line bg-surface-2 px-[9px] py-1 text-[11px] font-semibold text-muted;
 }
@@ -1192,91 +918,20 @@ a {
   border-color: color-mix(in srgb, var(--ok) 35%, transparent);
 }
 
-/* --------------------------------------------------------------------------
-   Features
-   -------------------------------------------------------------------------- */
-.feature-grid {
-  @apply mt-4 grid grid-cols-3 gap-3;
-}
-
-.feature {
-  @apply flex gap-3 rounded-card border border-line bg-surface p-4 transition-[border-color,background-color];
-}
-
-.feature:hover {
-  @apply bg-hover;
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
-}
-
-.feature__icon {
-  @apply grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px] text-accent;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-.feature__title {
-  @apply mb-[3px] text-sm font-semibold;
-}
-
-.feature__text {
-  @apply text-[12.8px] leading-[1.55] text-muted;
-}
-
-/* --------------------------------------------------------------------------
-   Pasos
-   -------------------------------------------------------------------------- */
-.steps {
-  @apply mt-4 grid grid-cols-3 gap-3;
-}
-
-.step {
-  @apply relative flex flex-col gap-2.5 rounded-card border border-line bg-surface px-4 pt-[18px] pb-4;
-}
-
-.step__num {
-  @apply absolute top-3.5 right-3.5 rounded-full px-2 py-0.5 text-xs font-bold;
-  color: color-mix(in srgb, var(--accent) 75%, var(--muted));
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-.step__icon {
-  @apply grid h-8 w-8 place-items-center rounded-[9px] border border-line bg-surface-2 text-ink;
-}
-
-.step__title {
-  @apply text-sm font-semibold;
-}
-
-.step__text {
-  @apply text-[12.8px] leading-[1.55] text-muted;
-}
-
-/* Rejillas de la portada: 3 por defecto, 2 en tablet, 1 en móvil.
+/* Rejilla de plataformas (404): 3 por defecto, 2 en tablet, 1 en móvil.
    El orden es decreciente para que la cascada resuelva bien. */
 @media (max-width: 960px) {
-  .platform-grid,
-  .feature-grid {
+  .platform-grid {
     @apply grid-cols-2;
   }
 }
 
 @media (max-width: 720px) {
-  .feature-grid,
-  .steps,
-  .program-grid {
-    @apply grid-cols-1;
-  }
-  .section-head {
-    @apply flex-col gap-2;
-  }
-  .hero__actions {
-    @apply justify-start;
-  }
   .header__inner {
     @apply min-h-0 flex-wrap gap-y-1 py-2.5;
   }
-  .nav {
-    @apply order-3 w-full flex-wrap gap-0;
+  .header__side {
+    @apply flex-wrap justify-end;
   }
   .nav__trigger {
     @apply px-2.5 text-[13px];
@@ -1284,41 +939,28 @@ a {
   .site-footer {
     @apply py-8;
   }
-  .site-footer__legal {
-    @apply mt-7;
-  }
 }
 
 @media (max-width: 560px) {
   .platform-grid {
     @apply grid-cols-1;
   }
-  .hero__actions-main {
-    @apply w-full flex-col;
+  /* En móvil sólo el icono: con seis nombres la fila ocupaba tres líneas. */
+  .hero__network-name {
+    @apply hidden;
   }
-  .hero__actions-main .btn {
-    @apply w-full;
+  .hero__network {
+    @apply px-1.5;
   }
 }
 
 /* --------------------------------------------------------------------------
    Móvil estrecho (320-400px: iPhone SE, Android de 360px, Galaxy Fold)
    -------------------------------------------------------------------------- */
-/* Dos problemas medidos a 320/360px, invisibles en anchos mayores:
-   1. Los menús se anclaban a su gatillo; el de «Transcribir» empieza ~115px
-      a la derecha y con `min-w-[252px]` acababa en 367px, así que la página
-      scrolleaba en horizontal (a 360px, 7px de hueco; a 320px, 47px).
-      Anclados al borde de la navegación caben: 24 + 252 = 276 < 320.
-   2. «Descargar para Windows» no cabía en su botón a todo ancho: el flex
-      encogía el icono a 0px y el texto se salía del borde. Con envoltura
-      libre entran las dos líneas. (El icono ya no encoge por `.btn svg`.) */
+/* El texto libre del botón (p. ej. «Analizar» con la etiqueta de estado
+   larga) se salía del borde a 320px si estaba en una sola línea: con
+   `white-space: normal` envuelve en dos líneas sin desbordar. */
 @media (max-width: 400px) {
-  .nav {
-    position: relative;
-  }
-  .nav__item {
-    position: static;
-  }
   .btn {
     white-space: normal;
   }
@@ -1505,8 +1147,8 @@ a {
 /* --------------------------------------------------------------------------
    Movimiento reducido
    --------------------------------------------------------------------------
-   La barra de progreso indeterminada se anima en bucle sin fin y los menús y
-   botones funden con transiciones. Quien pide movimiento reducido no quiere
+   La barra de progreso indeterminada se anima en bucle sin fin y los
+   elementos funden con transiciones. Quien pide movimiento reducido no quiere
    nada de eso: la animación infinita se para y el resto cambia de un golpe. */
 @media (prefers-reduced-motion: reduce) {
   .progress__fill--indeterminate {

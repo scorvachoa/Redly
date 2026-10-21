@@ -19,6 +19,11 @@ downloads/
 .DS_Store
 Thumbs.db
 
+# opencode: sólo el peso pesado; .opencode/plans y .opencode/skills sí se
+# versionan (el .gitignore anidado de la herramienta viaja sin trackear, así
+# que aquí queda cubierto para un clone limpio).
+.opencode/node_modules/
+
 # Los iconos de public/icons/ NO se ignoran: son entradas de build y tienen que
 # viajar al despliegue. Lo mismo con app/icon.svg, app/favicon.ico y
 # app/apple-icon.png.

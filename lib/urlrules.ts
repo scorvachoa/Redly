@@ -7,9 +7,9 @@
  * módulo concentra la clasificación en un registro equivalente al de
  * `lib/sources.ts`: la ruta resuelve las reglas por la URL y sólo delega.
  *
- * Apt navegador: lo usan las rutas (servidor), `components/Downloader.tsx`
- * para decidir el flujo sin una ida y vuelta a la API y
- * `components/HomeSearch.tsx` (buscador general de la portada).
+ * Apt navegador: lo usan las rutas (servidor) y
+ * `components/HomeDownloader.tsx` (buscador general de la portada) para
+ * resaltar la red detectada mientras se escribe.
  */
 
 import { getPlatform } from "./platforms";

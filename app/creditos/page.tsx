@@ -81,6 +81,18 @@ export default function CreditsPage() {
           </a>
           .
         </p>
+        <p>
+          El logotipo de Red.ly —la llama con flecha de descarga— es el icono{" "}
+          <b>Todos video downloader</b> de{" "}
+          <a
+            href="https://icon-icons.com/es/authors/602-jeremiah"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Jeremiah en Icon-Icons.com
+          </a>
+          .
+        </p>
 
         <h2>Despliegue</h2>
         <p>

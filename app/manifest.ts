@@ -8,8 +8,9 @@ import type { MetadataRoute } from "next";
  * iOS no lee este manifiesto: usa `apple-mobile-web-app-capable` y el
  * `apple-icon.png`, ambos declarados en `app/layout.tsx`.
  *
- * `theme_color` es el acento de marca: colorea la barra del sistema en
- * Android y se muestra en el diálogo de instalación.
+ * `theme_color` es el fondo de la app en tema oscuro: colorea la barra del
+ * sistema en Android (se funde con la interfaz, sin el rojo saturado de
+ * antes) y se muestra en el diálogo de instalación.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -25,7 +26,7 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "es",
     dir: "ltr",
     background_color: "#f5f5f7",
-    theme_color: "#fe2c55",
+    theme_color: "#0f0f12",
     categories: ["utilities", "productivity"],
     icons: [
       // `any` para el diálogo de escritorio y Android.

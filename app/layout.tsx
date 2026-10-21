@@ -11,7 +11,9 @@ export const metadata: Metadata = {
   applicationName: "Red.ly",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    // `black` = texto blanco en la barra: legible sobre el fondo oscuro de la
+    // app instalada (`default` dejaría texto negro sobre negro).
+    statusBarStyle: "black",
     title: "Red.ly",
   },
   other: {
@@ -23,10 +25,11 @@ export const metadata: Metadata = {
 
 /**
  * `theme_color` colorea la barra del sistema en Android y el título en la
- * pantalla de inicio. Es el mismo que declara `app/manifest.ts`.
+ * pantalla de inicio. Es el mismo que declara `app/manifest.ts`: el fondo
+ * oscuro de la app, para que la barra se funda con la interfaz.
  */
 export const viewport: Viewport = {
-  themeColor: "#fe2c55",
+  themeColor: "#0f0f12",
   width: "device-width",
   initialScale: 1,
 };

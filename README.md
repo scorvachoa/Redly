@@ -42,8 +42,8 @@ npm run smoke      # handlers de la API contra la red real
 
 | Ruta | Contenido |
 | --- | --- |
-| `/` | Portada: buscador general (detecta la red), plataformas, «Obtener programa» |
-| `/download/<plataforma>` | Descargador: `tiktok`, `youtube`, `facebook`, `instagram`, `twitter`, `threads`; el resto, «Próximamente». Acepta `?url=<enlace>`: rellena el campo y analiza solo |
+| `/` | Portada: buscador general con resultados en la misma página, iconos de las redes soportadas |
+| `/download/<plataforma>` | Descargador por plataforma (`tiktok`, `youtube`, `facebook`, `instagram`, `twitter`, `threads`; el resto, «Próximamente»). Acepta `?url=<enlace>`: rellena el campo y analiza solo |
 | `/transcript/<plataforma>` | Transcripción (todas «Próximamente») |
 | `/privacidad` · `/creditos` | Política de datos · créditos y licencias |
 
@@ -51,19 +51,24 @@ El registro de plataformas vive en `lib/platforms.ts`; una ruta desconocida
 cae en el 404 propio. Sólo se implementan las plataformas con fuente
 comprobada: no se inventan APIs.
 
-**Buscador general** (`components/HomeSearch.tsx`): un único campo para todas
-las redes; mientras se escribe, `lib/urlrules.ts` clasifica la entrada y un
-chip indica la red y el tipo detectado (vídeo, perfil, lista). Al enviar se
-navega a `/download/<slug>?url=<normalizada>`; `Downloader` recoge el
-parámetro, rellena su campo y lanza el análisis. Si la entrada no sirve, el
-motivo se cuenta en la propia portada.
+Las rutas `/download/*` y `/transcript/*` siguen disponibles escribiendo la
+URL a mano, pero ya **no se enlazan** desde la portada: todo empieza en el
+buscador general.
+
+**Buscador general** (`components/HomeDownloader.tsx`): un único campo para
+todas las redes; mientras se escribe, `lib/urlrules.ts` clasifica la entrada y
+se resalta el icono de la red detectada entre las que hay debajo. Al enviar,
+el análisis ocurre **en la misma página** —compartiendo el motor
+`useDownloaderEngine` con las páginas `/download/*`— y el resultado se pinta
+debajo del buscador. Si la entrada no sirve, el motivo se cuenta ahí mismo en
+la línea de estado.
 
 **Estilo y PWA:** Tailwind CSS v4 (`@apply` sobre clases semánticas en
 `app/globals.css`); tema claro/oscuro con `data-theme` en `<html>`. Web
-instalable: manifiesto + service worker que cachea **sólo** `/_next/static/`;
-botón de instalación en `components/InstallApp.tsx`. El favicon —llama con el
-degradado de la marca— está en `app/icon.svg`; los derivados se regeneran con
-`node scripts/make-favicon.cjs`.
+instalable: manifiesto + service worker que cachea **sólo** `/_next/static/`
+(el diálogo de instalación lo ofrece el propio navegador). El logotipo —llama
+con flecha de descarga, de Icon-Icons.com— está en `app/icon.svg`; los
+derivados se regeneran con `node scripts/make-favicon.cjs`.
 
 **Descargas e historial:** cada perfil se guarda en su subcarpeta
 (`@scout2015` → `scout2015/`). Con «Elegir carpeta» (`showDirectoryPicker`,
@@ -137,10 +142,10 @@ Redly/
 │   └── api/                    # search, profile, merge, render, download
 ├── public/                     # sw.js + iconos PWA
 ├── components/
-│   ├── SiteHeader.tsx · SiteFooter.tsx · ThemeToggle.tsx · InstallApp.tsx
-│   ├── HomeSearch.tsx          # buscador general de la portada
-│   ├── Downloader.tsx          # orquestador del descargador
-│   ├── downloader/             # piezas presentacionales
+│   ├── SiteHeader.tsx · SiteFooter.tsx · ThemeToggle.tsx
+│   ├── HomeDownloader.tsx      # buscador general de la portada (analiza en línea)
+│   ├── Downloader.tsx          # página /download/<plataforma>
+│   ├── downloader/             # piezas presentacionales + useDownloaderEngine
 │   └── icons.tsx               # SVG incrustados (FA6), sin react-icons
 ├── lib/                        # núcleo portable (sin next/*, apt navegador)
 │   ├── platforms.ts · sources.ts · urlrules.ts · config.ts · models.ts
