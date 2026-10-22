@@ -425,6 +425,48 @@ export const ALLOWED_DOWNLOAD_HOSTS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Bot de Telegram (webhook en Vercel)
+// ---------------------------------------------------------------------------
+/**
+ * Token del bot de Telegram (lo da @BotFather). Vacío = bot desactivado: la
+ * ruta del webhook responde 200 sin hacer nada.
+ */
+export const TELEGRAM_BOT_TOKEN = envStr("TELEGRAM_BOT_TOKEN", "");
+/**
+ * Secreto del webhook: se envía en la cabecera
+ * `X-Telegram-Bot-Api-Secret-Token` al registrar el webhook con
+ * `secret_token` y la ruta lo valida antes de procesar nada.
+ */
+export const TELEGRAM_WEBHOOK_SECRET = envStr("TELEGRAM_WEBHOOK_SECRET", "");
+/** Username visible del bot (sin @); si está vacío, la web no enlaza al bot. */
+export const TELEGRAM_BOT_USERNAME = envStr("TELEGRAM_BOT_USERNAME", "");
+/**
+ * Lista blanca de chats autorizados (ids numéricos, separados por comas).
+ * Vacía = nadie permitido (el webhook responde 200 sin contestar).
+ */
+export const TELEGRAM_ALLOWED_CHAT_IDS = parseChatIds(
+  envStr("TELEGRAM_ALLOWED_CHAT_IDS", ""),
+);
+/** Tope de bytes que se envían a Telegram por archivo (Bot API: 50 MB). */
+export const TELEGRAM_MAX_FILE_BYTES = envNum("TELEGRAM_MAX_FILE_BYTES", 50 * 1024 * 1024);
+/** Peticiones admitidas por chat dentro de la ventana del bot. */
+export const TELEGRAM_RATE_LIMIT_MAX = envNum("TELEGRAM_RATE_LIMIT_MAX", 20);
+export const TELEGRAM_RATE_LIMIT_WINDOW_SECONDS = envNum(
+  "TELEGRAM_RATE_LIMIT_WINDOW_SECONDS",
+  60,
+);
+
+/** `TELEGRAM_ALLOWED_CHAT_IDS="1,-100"` → `{"1","-100"}` (los ids de grupo son negativos). */
+function parseChatIds(value: string): ReadonlySet<string> {
+  return new Set(
+    value
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part !== ""),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Utilidades para logs
 // ---------------------------------------------------------------------------
 /** Devuelve sólo el host de una URL (seguro para logs). */

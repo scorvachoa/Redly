@@ -159,3 +159,15 @@ export const apiLimiter = new RateLimiter({
   windowSeconds: Number(process.env.RATE_LIMIT_WINDOW_SECONDS ?? 60),
   max: Number(process.env.RATE_LIMIT_MAX ?? 30),
 });
+
+/**
+ * Limitador del bot de Telegram, por `chat.id`.
+ *
+ * Clave separada de `apiLimiter`: el webhook llega de los servidores de
+ * Telegram (la IP no distingue entre usuarios), así que la cuota se acota por
+ * chat, que es el sujeto real del abuso.
+ */
+export const telegramLimiter = new RateLimiter({
+  windowSeconds: Number(process.env.TELEGRAM_RATE_LIMIT_WINDOW_SECONDS ?? 60),
+  max: Number(process.env.TELEGRAM_RATE_LIMIT_MAX ?? 20),
+});

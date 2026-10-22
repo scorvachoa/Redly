@@ -7,6 +7,8 @@ muestra las opciones de descarga, o lista un **perfil completo** de TikTok y
 descarga en lote con historial y reanudación.
 
 Aplicación web: interfaz en el navegador + API propia que hace de proxy.
+**Bot de Telegram**: pega la misma URL en el chat y el bot devuelve el vídeo
+en la mejor calidad (o las fotos) directamente.
 
 **Web desplegada:** <https://red-ly.vercel.app/>
 
@@ -80,7 +82,7 @@ marca lo ya descargado, lo excluye del lote y permite reanudar.
 
 ## API
 
-Cinco rutas bajo `/api`, implementadas como Route Handlers de Next.js:
+Seis rutas bajo `/api`, implementadas como Route Handlers de Next.js:
 
 | Ruta | Método | Descripción |
 | --- | --- | --- |
@@ -89,6 +91,7 @@ Cinco rutas bajo `/api`, implementadas como Route Handlers de Next.js:
 | `/api/merge` | `GET ?yt=&v=&a=` | combina vídeo+audio de YouTube en SnapYT |
 | `/api/render` | `GET ?job=&source=` | resuelve un trabajo de render (FSave/LoveInsta/iLoveX/SaveThreads) |
 | `/api/download` | `GET ?url=&name=` | proxy de streaming con `Content-Disposition: attachment` |
+| `/api/telegram/webhook` | `POST` (update) | updates del bot de Telegram (secreto obligatorio) |
 
 * `/api/profile` devuelve **una página** por invocación (`max` por defecto
   100, `next_cursor: null` = fin) y acepta el perfil abreviado `@usuario`.
@@ -131,6 +134,49 @@ el lote permite elegir entre la opción **recomendada**, **máxima calidad**
 
 ---
 
+## Bot de Telegram
+
+Un bot conectado por **webhook** repite el flujo de la web dentro de Telegram:
+el usuario pega la URL de un vídeo suelto (o publicación con fotos) de
+**cualquiera de las 6 redes** y el bot responde directamente con el archivo en
+**mejor calidad posible**, sin preguntar por la calidad. Usa el mismo motor
+(`classifyInput` → fuente → `batchOption(result, "max")`) y las mismas
+funciones para resolver `/api/merge` y `/api/render`.
+
+| Mensaje | Respuesta |
+| --- | --- |
+| `/start` · `/help` | Ayuda y límites |
+| URL de vídeo | `sendVideo` con la mejor opción (en YouTube resuelve la combinación; si Telegram no baja la URL, se sube el archivo como respaldo) |
+| URL con fotos | Álbum con todas las fotos (una sola → `sendPhoto`) |
+| URL de perfil/lista | Aviso de que aún no está disponible en el bot (la web sí) |
+| Cualquier otra cosa | Mensaje con las redes soportadas |
+
+**Configuración** (`.env` / panel de Vercel; ver `.env.example`):
+
+```text
+TELEGRAM_BOT_TOKEN        # token de @BotFather; vacío = bot desactivado
+TELEGRAM_WEBHOOK_SECRET   # secreto validado en la cabecera del webhook
+TELEGRAM_ALLOWED_CHAT_IDS # ids numéricos con comas; vacío = nadie
+TELEGRAM_BOT_USERNAME     # username visible; si está, el pie enlaza al bot
+```
+
+**Registro del webhook** (una vez, tras desplegar):
+
+```bash
+npm run telegram:webhook -- https://red-ly.vercel.app   # getMe + setWebhook
+npm run telegram:webhook -- https://red-ly.vercel.app --delete
+```
+
+Si falta el secreto, el script genera uno e imprime el valor para copiarlo a
+Vercel. La ruta `/api/telegram/webhook` valida la cabecera
+`X-Telegram-Bot-Api-Secret-Token` con comparación en tiempo constante y
+siempre responde 200 cuando el secreto es correcto (Telegram reintenta si no;
+el dedupe por `update_id` evita dobles envíos). El acceso es **privado por
+allowlist**: los chats no autorizados no reciben respuesta. Límite de tasa
+por chat (20/min por defecto) y tope de 50 MB por archivo (Bot API).
+
+---
+
 ## Arquitectura
 
 ```text
@@ -139,7 +185,7 @@ Redly/
 │   ├── page.tsx                # portada (servidor)
 │   ├── download/[platform]/    # UI del descargador; resto: "Próximamente"
 │   ├── transcript/[platform]/  # todas "Próximamente"
-│   └── api/                    # search, profile, merge, render, download
+│   └── api/                    # search, profile, merge, render, download, telegram/webhook
 ├── public/                     # sw.js + iconos PWA
 ├── components/
 │   ├── SiteHeader.tsx · SiteFooter.tsx · ThemeToggle.tsx
@@ -153,7 +199,8 @@ Redly/
 │   ├── fsave.ts · igexport.ts · loveinsta.ts · ilovex.ts · savethreads.ts
 │   ├── *-urls.ts · ratelimit.ts · cache.ts · history.ts · sanitize.ts
 │   ├── download-stream.ts · fsaccess.ts · downloader.ts · site.ts
-├── scripts/                    # api-smoke, extract-icons, make-favicon
+│   ├── telegram.ts · telegram-bot.ts   # cliente Bot API + lógica del bot
+├── scripts/                    # api-smoke, extract-icons, make-favicon, telegram-set-webhook
 ├── tests/                      # vitest, sin red (+ fixtures HTML/JSON)
 ├── vercel.json · vitest.config.ts · .env.example
 └── postcss.config.mjs
@@ -169,11 +216,11 @@ navegador los usa directamente (destino de descargas e historial web).
 
 ## Tests
 
-`npm test`: **388 tests en 25 ficheros, sin Internet** (fetch mockeado y
+`npm test`: **421 tests en 27 ficheros, sin Internet** (fetch mockeado y
 fixtures HTML anonimizadas en `tests/fixtures/`): clasificación de URLs por
 plataforma, contrato `ContentSource`, cada fuente (mint HMAC, render, errores
 del servicio, reintentos), merge de YouTube, paginación de perfiles, límite de
-tasa, caché, historial y utilidades.
+tasa, caché, historial, cliente y lógica del bot de Telegram, y utilidades.
 
 `npm run smoke` (opcional, **sí** necesita Internet) invoca los handlers
 reales: paginación de un perfil, el flujo de combinación de YouTube, el
@@ -194,6 +241,7 @@ REQUEST_TIMEOUT / DOWNLOAD_TIMEOUT / MAX_REDIRECTS
 RETRY_ATTEMPTS / RETRY_BACKOFF_SECONDS
 API_PROFILE_MAX · RATE_LIMIT_MAX / RATE_LIMIT_WINDOW_SECONDS
 PROFILE_CACHE_TTL_MS
+TELEGRAM_* (bot: token, secreto, allowlist, límites)
 ```
 
 `ALLOWED_DOWNLOAD_HOSTS` **no** es variable de entorno: es la lista fija de
@@ -207,6 +255,11 @@ CDNs, dentro de `lib/config.ts`.
 2. Sin secretos ni claves: el proyecto trabaja con URLs públicas.
 3. No hay FS persistente entre invocaciones: el historial vive en el
    navegador y el lote pagina `/api/profile` invocación a invocación.
+4. **Bot de Telegram** (opcional): crea el bot con @BotFather, define
+   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` y
+   `TELEGRAM_ALLOWED_CHAT_IDS` en el panel de Vercel y registra el webhook
+   con `npm run telegram:webhook -- https://tu-app.vercel.app` (sección
+   «Bot de Telegram»).
 
 ---
 
@@ -235,6 +288,10 @@ CDNs, dentro de `lib/config.ts`.
   recargas.
 * Si un análisis de perfil es muy largo, los enlaces de `/api/profile` pueden
   caducar (~1 h): hay que volver a analizar.
+* **Bot de Telegram**: sólo vídeos y fotos sueltos (sin perfiles ni lotes);
+  archivos hasta 50 MB (límite de la Bot API). El dedupe del webhook, el
+  límite por chat y la allowlist viven en memoria **por instancia** de la
+  función serverless, igual que el resto de estado del proyecto.
 
 ---
 

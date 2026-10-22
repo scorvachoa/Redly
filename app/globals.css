@@ -175,6 +175,11 @@ a {
   @apply max-w-[80ch] text-[12.5px] leading-[1.6] text-muted;
 }
 
+/* Enlace al bot de Telegram (sólo si TELEGRAM_BOT_USERNAME está configurado). */
+.site-footer__link {
+  @apply text-accent underline-offset-2 hover:underline;
+}
+
 /* --------------------------------------------------------------------------
    Controles
    -------------------------------------------------------------------------- */

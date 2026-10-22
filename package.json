@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "tsx scripts/api-smoke.ts"
+    "smoke": "tsx scripts/api-smoke.ts",
+    "telegram:webhook": "tsx scripts/telegram-set-webhook.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
