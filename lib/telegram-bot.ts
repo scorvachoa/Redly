@@ -35,7 +35,7 @@ import {
   TelegramApiError,
   type TelegramUpdate,
 } from "./telegram";
-import { classifyInput } from "./urlrules";
+import { classifyInput, type ClassifiedUrl } from "./urlrules";
 
 /** Enlace de la web mostrado en la ayuda y en los mensajes «úsalo en la web». */
 export const TELEGRAM_SITE_URL = "https://red-ly.vercel.app";
@@ -209,8 +209,40 @@ function parseUpdate(update: unknown): { update_id: number; message: TelegramUpd
 // Flujo de una URL
 // ---------------------------------------------------------------------------
 
+/** URLs embebidas en texto libre (los botones «Compartir» pegan texto + enlace). */
+const URL_IN_TEXT_RE = /https?:\/\/[^\s<>"']+/gi;
+
+/** Puntuación final que arrastra el enlace al copiar, no forma parte de la URL. */
+const TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}»"']+$/;
+
+/**
+ * Primera URL soportada dentro de un texto libre.
+ *
+ * Compartir desde TikTok u otras apps pega un párrafo con el enlace en medio
+ * (`… #TikTok https://vm.tiktok.com/…/ Esta publicación se ha compartido…
+ * https://www.tiktok.com/tiktoklite`). Se extraen todas las URLs del texto y se
+ * devuelve la primera que clasifica como vídeo; si ninguna lo es, la primera
+ * clasificable de cualquier tipo (así un perfil sigue contestando con el
+ * mensaje de «úsalo en la web»).
+ */
+function classifiedUrlFromText(text: string): ClassifiedUrl | null {
+  const candidates = (text.match(URL_IN_TEXT_RE) ?? []).map((raw) =>
+    raw.replace(TRAILING_PUNCTUATION_RE, ""),
+  );
+  let first: ClassifiedUrl | null = null;
+  for (const candidate of candidates) {
+    const classified = classifyInput(candidate);
+    if (!classified) continue;
+    if (classified.kind === "video") return classified;
+    first ??= classified;
+  }
+  return first;
+}
+
 async function handleUrlInput(text: string, chatId: number, deps: BotDeps): Promise<void> {
-  const classified = classifyInput(text);
+  // La entrada puede ser la URL sola o el texto de compartir con el enlace en
+  // medio; en ese caso se queda con la primera URL soportada del párrafo.
+  const classified = classifyInput(text) ?? classifiedUrlFromText(text);
   if (!classified) {
     await safeSend(deps, chatId, UNSUPPORTED_URL_TEXT);
     return;

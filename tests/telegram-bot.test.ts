@@ -287,6 +287,49 @@ describe("handleTelegramUpdate · clasificación", () => {
 
     expect(api.messages()[0]).toContain("no corresponde a un vídeo concreto");
   });
+
+  it("extrae la URL de un texto de compartir de TikTok y ignora el enlace promocional", async () => {
+    const searchVideo = vi.fn(async () => TIKTOK_RESULT);
+    const { api, deps } = harness({ searchVideo });
+
+    await handleTelegramUpdate(
+      updateWith(
+        "¡Echa un vistazo al vídeo de 🍄𝐃𝐉 𝐊𝐀𝐓𝐀𝐋𝐄𝐘𝐀🦋! #TikTok https://vm.tiktok.com/ZSgPuHxtw/ " +
+          "Esta publicación se ha compartido a través de TikTok Lite. Para disfrutar de más " +
+          "publicaciones, descarga TikTok Lite: https://www.tiktok.com/tiktoklite",
+      ),
+      deps,
+    );
+
+    expect(searchVideo).toHaveBeenCalledTimes(1);
+    expect(searchVideo).toHaveBeenCalledWith("https://vm.tiktok.com/ZSgPuHxtw/");
+    expect(api.of("sendVideo")).toHaveLength(1);
+  });
+
+  it("con texto alrededor funciona en cualquier plataforma y recorta la puntuación final", async () => {
+    const searchVideo = vi.fn(async () => YT_MERGE_RESULT);
+    const resolvePreparedUrl = vi.fn(async () => "https://cdn.test/combinado.mp4");
+    const { api, deps } = harness({ searchVideo, resolvePreparedUrl });
+
+    await handleTelegramUpdate(
+      updateWith("Mira este vídeo que me acaban de pasar: https://youtu.be/dQw4w9WgXcQ ¡increíble!"),
+      deps,
+    );
+
+    expect(searchVideo).toHaveBeenCalledWith("https://youtu.be/dQw4w9WgXcQ");
+    expect(api.of("sendVideo")).toHaveLength(1);
+  });
+
+  it("un texto de compartir con una URL de perfil sigue avisando para usar la web", async () => {
+    const { api, deps } = harness();
+
+    await handleTelegramUpdate(
+      updateWith("Sígueme en TikTok: https://www.tiktok.com/@scout2015 para ver más vídeos"),
+      deps,
+    );
+
+    expect(api.messages()[0]).toContain("perfiles");
+  });
 });
 
 describe("handleTelegramUpdate · envío de vídeo", () => {
