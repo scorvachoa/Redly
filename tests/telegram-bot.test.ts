@@ -80,6 +80,7 @@ const CHAT = 111;
 
 interface HarnessOptions {
   allowed?: string[];
+  publicAccess?: boolean;
   limiterMax?: number;
   searchVideo?: (url: string) => Promise<TikTokResult>;
   resolvePreparedUrl?: (relativeUrl: string) => Promise<string>;
@@ -92,6 +93,7 @@ function harness(options: HarnessOptions = {}) {
   const deps: BotDeps = {
     api,
     allowedChatIds: new Set(options.allowed ?? [String(CHAT)]),
+    publicAccess: options.publicAccess ?? false,
     limiter: new RateLimiter({ windowSeconds: 60, max: options.limiterMax ?? 20 }),
     seenUpdates: new TtlCache<boolean>({ maxEntries: 100 }),
     searchVideo: options.searchVideo ?? (async () => TIKTOK_RESULT),
@@ -249,6 +251,22 @@ describe("handleTelegramUpdate · comandos y allowlist", () => {
     const { api, deps } = harness({ allowed: [] });
 
     await handleTelegramUpdate(updateWith(TIKTOK_VIDEO), deps);
+
+    expect(api.calls).toHaveLength(0);
+  });
+
+  it("el modo público atiende a cualquier chat ignorando la allowlist", async () => {
+    const { api, deps } = harness({ allowed: [], publicAccess: true });
+
+    await handleTelegramUpdate(updateWith(TIKTOK_VIDEO, 424242), deps);
+
+    expect(api.of("sendVideo")).toHaveLength(1);
+  });
+
+  it("sin modo público la allowlist sigue mandando, aunque haya ids cargados", async () => {
+    const { api, deps } = harness({ allowed: [String(CHAT)], publicAccess: false });
+
+    await handleTelegramUpdate(updateWith(TIKTOK_VIDEO, 424242), deps);
 
     expect(api.calls).toHaveLength(0);
   });

@@ -157,6 +157,7 @@ funciones para resolver `/api/merge` y `/api/render`.
 TELEGRAM_BOT_TOKEN        # token de @BotFather; vacío = bot desactivado
 TELEGRAM_WEBHOOK_SECRET   # secreto validado en la cabecera del webhook
 TELEGRAM_ALLOWED_CHAT_IDS # ids numéricos con comas; vacío = nadie
+TELEGRAM_BOT_PUBLIC       # true = abierto a cualquier chat (ignora la allowlist)
 TELEGRAM_BOT_USERNAME     # username visible; si está, el pie enlaza al bot
 ```
 
@@ -172,8 +173,10 @@ Vercel. La ruta `/api/telegram/webhook` valida la cabecera
 `X-Telegram-Bot-Api-Secret-Token` con comparación en tiempo constante y
 siempre responde 200 cuando el secreto es correcto (Telegram reintenta si no;
 el dedupe por `update_id` evita dobles envíos). El acceso es **privado por
-allowlist**: los chats no autorizados no reciben respuesta. Límite de tasa
-por chat (20/min por defecto) y tope de 50 MB por archivo (Bot API).
+allowlist**: los chats no autorizados no reciben respuesta; con
+`TELEGRAM_BOT_PUBLIC=true` el bot se abre a cualquier chat (la allowlist se
+ignora). Límite de tasa por chat (20/min por defecto) y tope de 50 MB por
+archivo (Bot API).
 
 ---
 

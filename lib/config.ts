@@ -20,6 +20,12 @@ function envNum(key: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function envBool(key: string, fallback: boolean): boolean {
+  const value = env[key];
+  if (value === undefined || value === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
 function stripSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -442,11 +448,16 @@ export const TELEGRAM_WEBHOOK_SECRET = envStr("TELEGRAM_WEBHOOK_SECRET", "");
 export const TELEGRAM_BOT_USERNAME = envStr("TELEGRAM_BOT_USERNAME", "");
 /**
  * Lista blanca de chats autorizados (ids numéricos, separados por comas).
- * Vacía = nadie permitido (el webhook responde 200 sin contestar).
+ * Vacía = nadie permitido (salvo modo público); los ids de grupo son negativos.
  */
 export const TELEGRAM_ALLOWED_CHAT_IDS = parseChatIds(
   envStr("TELEGRAM_ALLOWED_CHAT_IDS", ""),
 );
+/**
+ * Modo público: `true` ignora la allowlist y el bot atiende a cualquier chat.
+ * Por defecto `false` (acceso restringido a `TELEGRAM_ALLOWED_CHAT_IDS`).
+ */
+export const TELEGRAM_BOT_PUBLIC = envBool("TELEGRAM_BOT_PUBLIC", false);
 /** Tope de bytes que se envían a Telegram por archivo (Bot API: 50 MB). */
 export const TELEGRAM_MAX_FILE_BYTES = envNum("TELEGRAM_MAX_FILE_BYTES", 50 * 1024 * 1024);
 /** Peticiones admitidas por chat dentro de la ventana del bot. */

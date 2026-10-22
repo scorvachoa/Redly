@@ -17,6 +17,7 @@
 import { TtlCache } from "./cache";
 import {
   TELEGRAM_ALLOWED_CHAT_IDS,
+  TELEGRAM_BOT_PUBLIC,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_MAX_FILE_BYTES,
   TELEGRAM_WEBHOOK_SECRET,
@@ -77,8 +78,10 @@ const seenTelegramUpdates = new TtlCache<boolean>({ maxEntries: 500 });
 
 export interface BotDeps {
   api: TelegramApi;
-  /** Chats autorizados; vacío = nadie. */
+  /** Chats autorizados; vacío = nadie (ignorada si `publicAccess`). */
   allowedChatIds: ReadonlySet<string>;
+  /** `true` = atiende a cualquier chat, ignorando la allowlist. */
+  publicAccess: boolean;
   limiter: RateLimiter;
   /** Dedupe de reintentos del webhook (por `update_id`). */
   seenUpdates: TtlCache<boolean>;
@@ -97,6 +100,7 @@ export function createBotDeps(): BotDeps {
   return {
     api,
     allowedChatIds: TELEGRAM_ALLOWED_CHAT_IDS,
+    publicAccess: TELEGRAM_BOT_PUBLIC,
     limiter: telegramLimiter,
     seenUpdates: seenTelegramUpdates,
     searchVideo(url) {
@@ -160,7 +164,13 @@ export async function handleTelegramUpdate(update: unknown, deps: BotDeps): Prom
   const chatId = message.chat.id;
 
   // Allowlist: fuera de la lista, respuesta 200 del webhook sin contestar.
-  if (deps.allowedChatIds.size === 0 || !deps.allowedChatIds.has(String(chatId))) return;
+  // El modo público (`TELEGRAM_BOT_PUBLIC`) ignora la lista y atiende a todos.
+  if (
+    !deps.publicAccess &&
+    (deps.allowedChatIds.size === 0 || !deps.allowedChatIds.has(String(chatId)))
+  ) {
+    return;
+  }
 
   const text = (message.text ?? "").trim();
   if (!text) return;
